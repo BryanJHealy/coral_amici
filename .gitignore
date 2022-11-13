@@ -8,3 +8,4 @@ src/util/lstm_basic
 *.mid
 *.log
 *.tflite
+.idea/
