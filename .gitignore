@@ -1,0 +1,10 @@
+env/
+milestones/
+.git/
+src/data/
+src/.idea/
+src/util/training_checkpoints/
+src/util/lstm_basic
+*.mid
+*.log
+*.tflite
