@@ -181,7 +181,8 @@ def predict_next_note(
 
 if __name__ == '__main__':
     # TODO: use relative path
-    filenames = glob.glob(str('/media/steamgames/coral/src/data/maestro/**/*.mid*'))
+    filenames = glob.glob(str('/media/steamgames/coral/coral_amici/src/data/maestro/**/*.mid*'))
+    # filenames = glob.glob(str('/media/steamgames/coral/coral_amici/src/data/lakh/clean_midi/**/*.mid*'))
     print(f'#files: {len(filenames)}')
 
     # sample from dataset
@@ -212,7 +213,7 @@ if __name__ == '__main__':
     # plot_distributions(raw_notes)
 
     # -----------
-    num_files = 1  # 5
+    num_files = 100
     all_notes = []
     for f in filenames[:num_files]:
         notes = midi_to_notes(f)
@@ -256,11 +257,14 @@ if __name__ == '__main__':
 
     inputs = tf.keras.Input(input_shape)
     x = tf.keras.layers.LSTM(128)(inputs)
+    x1 = tf.keras.layers.Dense(128)(x)
+    x2 = tf.keras.layers.RepeatVector(3)(x1)
+    x3 = tf.keras.layers.LSTM(128, return_sequences=True)(x2)
 
     outputs = {
-        'pitch': tf.keras.layers.Dense(128, name='pitch')(x),
-        'step': tf.keras.layers.Dense(1, name='step')(x),
-        'duration': tf.keras.layers.Dense(1, name='duration')(x),
+        'pitch': tf.keras.layers.Dense(128, name='pitch')(x3),
+        'step': tf.keras.layers.Dense(1, name='step')(x3),
+        'duration': tf.keras.layers.Dense(1, name='duration')(x3),
     }
 
     model = tf.keras.Model(inputs, outputs)
@@ -304,7 +308,7 @@ if __name__ == '__main__':
             restore_best_weights=True),
     ]
 
-    epochs = 1
+    epochs = 50
 
     history = model.fit(
         train_ds,
