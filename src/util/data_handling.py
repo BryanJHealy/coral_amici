@@ -45,96 +45,100 @@ def create_sequences_for_replication(
     flatten = lambda x: x.batch(seq_length, drop_remainder=True)
     sequences = windows.flat_map(flatten)
 
-    # Normalize note pitch
+    # Normalize note pitch from 0-128 to 0.0-1.0 range
     def scale_pitch(x):
         x = x / [vocab_size, 1.0, 1.0]
         return x
 
     # Split the labels
-    def split_labels(sequences):
+    def replicate_labels(sequences):
         scaled = scale_pitch(sequences)
         return scaled, scaled
 
-    return sequences.map(split_labels, num_parallel_calls=tfd.AUTOTUNE)
+    return sequences.map(replicate_labels, num_parallel_calls=tfd.AUTOTUNE)
 
 
 def create_sequences_for_accompaniment(
-        melody_dataset: tfd.Dataset,
-        accomp_dataset: tfd.Dataset,
-        seq_length: int,
+        melody_dataset: np.array,
+        accomp_dataset: np.array,
+        seq_time: float,
         vocab_size=128,
-        num_samples=1800
+        sample_frequency=60
 ) -> tfd.Dataset:
-    """Returns TF Dataset of sequences and their identity as labels."""
+    """Returns TF Dataset of melody sequences and their accompaniment sequences."""
 
-    def get_activation_tensor(dataset, sample_time, ds_idx):
+    pitch_col, start_col, end_col = 0, 1, 2
+
+    def get_activation_tensor(note_events, sample_time, ds_idx):
         activation = np.zeros(vocab_size)
-        for note_idx in range(ds_idx, len(dataset)):  # TODO check bounds
-            note = dataset[note_idx]
-            if note['start'] <= sample_time:
-                if note['end'] > sample_time:
-                    activation[int(note['pitch'])] = 1.0  # TODO: vocab 0-based index?
+        for note_idx in range(ds_idx, len(note_events)):  # TODO check bounds
+            note = note_events[note_idx]
+            if note[start_col] <= sample_time:
+                if note[end_col] > sample_time:
+                    activation[int(note[pitch_col])] = 1.0  # TODO: vocab 0-based index?
                 else:
                     ds_idx += 1  # increment dataset pointer
             else:
                 break
         return activation, ds_idx
 
+    mel_windows = []
+    acc_windows = []
+
     mel_idx = 0
     acc_idx = 0
-    sample_period = 30.0/num_samples
-    for sample_num in range(num_samples):
-        sample_time = sample_num * sample_period
+    file_end_time = max(melody_dataset[-1][end_col], accomp_dataset[-1][end_col])
+    file_samples = file_end_time * sample_frequency
+    sequence_samples = seq_time * sample_frequency
+
+    mel_window = np.zeros((vocab_size, sequence_samples))
+    acc_window = np.zeros((vocab_size, sequence_samples))
+    for sample_num in range(file_samples):
+        sample_time = sample_num / sample_frequency
         active_mel_pitches, mel_idx = get_activation_tensor(melody_dataset, sample_time, mel_idx)
         active_acc_pitches, acc_idx = get_activation_tensor(accomp_dataset, sample_time, acc_idx)
 
-    # add window, window = window[1:], window.extend(empty_column, axis=1), window[-1] |= active_pitches
+        if sample_num < sequence_samples:  # build entire first window
+            mel_window[:, sample_num] = active_mel_pitches
+            acc_window[:, sample_num] = active_acc_pitches
+        else:  # shift windows by one sample
+            mel_window = mel_window[:, 1:]
+            acc_window = acc_window[:, 1:]
+            mel_window = np.append(mel_window, active_mel_pitches)
+            acc_window = np.append(acc_window, active_acc_pitches)
 
-    windows = dataset.window(seq_length, shift=1, stride=1,
-                             drop_remainder=True)
+        mel_windows.append(mel_window)
+        acc_windows.append(acc_window)
 
-    # `flat_map` flattens the" dataset of datasets" into a dataset of tensors
-    flatten = lambda x: x.batch(seq_length, drop_remainder=True)
-    sequences = windows.flat_map(flatten)
-
-    # Normalize note pitch
-    def scale_pitch(x):
-        x = x / [vocab_size, 1.0, 1.0]
-        return x
-
-    # Split the labels
-    def split_labels(sequences):
-        scaled = scale_pitch(sequences)
-        return scaled, scaled
-
-    return sequences.map(split_labels, num_parallel_calls=tfd.AUTOTUNE)
+    dataset = tfd.Dataset.from_tensor_slices(mel_windows, acc_windows)
+    return dataset
 
 
 def parse_pop_song_accompaniment(filename):
     # create dataset with (MELODY sequence):(PIANO sequence)
     song = pretty_midi.PrettyMIDI(filename)
-    melody_ds = None
-    accomp_ds = None
-    key_order = ['pitch', 'start', 'end']
+    melody_notes = None
+    accomp_notes = None
     for instrument_idx in range(len(song.instruments)):
         if song.instruments[instrument_idx].name is 'MELODY':
             melody_notes = midi_to_notes(instrument_index=instrument_idx)
             melody_notes = np.stack([melody_notes[key] for key in key_order], axis=1)
-            melody_ds = tfd.Dataset.from_tensor_slices(melody_notes)
+            # melody_ds = tfd.Dataset.from_tensor_slices(melody_notes)
         elif song.instruments[instrument_idx].name is 'PIANO':
             accomp_notes = midi_to_notes(instrument_index=instrument_idx)
             accomp_notes = np.stack([accomp_notes[key] for key in key_order], axis=1)
-            accomp_ds = tfd.Dataset.from_tensor_slices(accomp_notes)
-    return melody_ds, accomp_ds
+            # accomp_ds = tfd.Dataset.from_tensor_slices(accomp_notes)
+    return melody_notes, accomp_notes
 
 
 def get_pop_data(path):
     # TODO: use os to make cross-platform. Currently needs a '/' at end of path
     midi_files = glob.glob(str(f'{path}**/*.mid*'))
-    file_datasets = []
+    dataset = None
     for song in midi_files:
-        melody_ds, accomp_ds = parse_pop_song_accompaniment(song)
-        if (melody_ds is None) or (accomp_ds is None):
+        melody_notes, accomp_notes = parse_pop_song_accompaniment(song)
+        if (melody_notes is None) or (accomp_notes is None):
             continue
-        create_sequences_for_accompaniment(melody_ds, accomp_ds)
+        song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes)
+        dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
 
