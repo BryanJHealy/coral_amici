@@ -131,18 +131,23 @@ def parse_pop_song_accompaniment(filename):
     return melody_notes, accomp_notes
 
 
-def get_pop_data(path, sequence_duration, vocab_size=128):
+def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10):
     # TODO: use os to make cross-platform. Currently needs a '/' at end of path
     midi_files = glob.glob(str(f'{path}**/*.mid*'))
     dataset = None
+    num_processed = 0
     for song in midi_files:
-        melody_notes, accomp_notes = parse_pop_song_accompaniment(song)
-        if (melody_notes is None) or (accomp_notes is None):
-            continue
+        if num_processed < max_files:
+            melody_notes, accomp_notes = parse_pop_song_accompaniment(song)
+            if (melody_notes is None) or (accomp_notes is None):
+                continue
 
-        song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes,
-                                                     sequence_duration, vocab_size=vocab_size)
+            song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes,
+                                                         sequence_duration, vocab_size=vocab_size)
 
-        dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
+            dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
+            num_processed += 1
+        else:
+            break
     return dataset
 

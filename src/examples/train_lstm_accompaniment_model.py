@@ -20,7 +20,9 @@ if __name__ == '__main__':
     # TODO: use path libraries
     # TODO: add verbose flags
     sequence_duration = 15  # seconds per sequence
-    dataset = get_pop_data(parameters['data_root_path'], sequence_duration)
+    print('Building dataset...')
+    max_files = 10
+    dataset = get_pop_data(parameters['data_root_path'], sequence_duration, max_files=max_files)
 
     batch_size = 64
     buffer_size = dataset.cardinality().numpy()  # the number of items in the dataset
@@ -32,7 +34,12 @@ if __name__ == '__main__':
 
     # print(train_ds.element_spec)
 
+    print('Building model...')
     model = LstmAccompaniment(sequence_duration=15, sampling_frequency=60, learning_rate=0.005)
+    print('Training model...')
     model.train(train_ds=train_ds, epochs=50)
+    print('Saving model...')
     model.save()
+    print('Evaluating model...')
     model.evaluate(train_ds)  # TODO: separate an eval set
+    print('Done.')
