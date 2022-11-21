@@ -10,8 +10,7 @@ import glob
 key_order = ['pitch', 'step', 'duration']
 
 
-def midi_to_notes(midi_file: str, instrument_index=0) -> pd.DataFrame:
-    pm = pretty_midi.PrettyMIDI(midi_file)
+def midi_to_notes(pm: pretty_midi.PrettyMIDI, instrument_index=0) -> pd.DataFrame:
     instrument = pm.instruments[instrument_index]
     notes = collections.defaultdict(list)
 
@@ -61,7 +60,7 @@ def create_sequences_for_replication(
 def create_sequences_for_accompaniment(
         melody_dataset: np.array,
         accomp_dataset: np.array,
-        seq_time: float,
+        seq_duration: float,
         vocab_size=128,
         sample_frequency=60
 ) -> tfd.Dataset:
@@ -88,8 +87,8 @@ def create_sequences_for_accompaniment(
     mel_idx = 0
     acc_idx = 0
     file_end_time = max(melody_dataset[-1][end_col], accomp_dataset[-1][end_col])
-    file_samples = file_end_time * sample_frequency
-    sequence_samples = seq_time * sample_frequency
+    file_samples = int(np.ceil(file_end_time * sample_frequency))
+    sequence_samples = seq_duration * sample_frequency
 
     mel_window = np.zeros((vocab_size, sequence_samples))
     acc_window = np.zeros((vocab_size, sequence_samples))
@@ -107,10 +106,11 @@ def create_sequences_for_accompaniment(
             mel_window = np.append(mel_window, active_mel_pitches)
             acc_window = np.append(acc_window, active_acc_pitches)
 
-        mel_windows.append(mel_window)
-        acc_windows.append(acc_window)
+        if mel_window.any() and acc_window.any():  # don't add data if either window is empty
+            mel_windows.append(mel_window)
+            acc_windows.append(acc_window)
 
-    dataset = tfd.Dataset.from_tensor_slices(mel_windows, acc_windows)
+    dataset = tfd.Dataset.from_tensor_slices((mel_windows, acc_windows))
     return dataset
 
 
@@ -120,18 +120,18 @@ def parse_pop_song_accompaniment(filename):
     melody_notes = None
     accomp_notes = None
     for instrument_idx in range(len(song.instruments)):
-        if song.instruments[instrument_idx].name is 'MELODY':
-            melody_notes = midi_to_notes(instrument_index=instrument_idx)
+        if song.instruments[instrument_idx].name == 'MELODY':
+            melody_notes = midi_to_notes(song, instrument_index=instrument_idx)
             melody_notes = np.stack([melody_notes[key] for key in key_order], axis=1)
             # melody_ds = tfd.Dataset.from_tensor_slices(melody_notes)
-        elif song.instruments[instrument_idx].name is 'PIANO':
-            accomp_notes = midi_to_notes(instrument_index=instrument_idx)
+        elif song.instruments[instrument_idx].name == 'PIANO':
+            accomp_notes = midi_to_notes(song, instrument_index=instrument_idx)
             accomp_notes = np.stack([accomp_notes[key] for key in key_order], axis=1)
             # accomp_ds = tfd.Dataset.from_tensor_slices(accomp_notes)
     return melody_notes, accomp_notes
 
 
-def get_pop_data(path):
+def get_pop_data(path, sequence_duration, vocab_size=128):
     # TODO: use os to make cross-platform. Currently needs a '/' at end of path
     midi_files = glob.glob(str(f'{path}**/*.mid*'))
     dataset = None
@@ -139,6 +139,10 @@ def get_pop_data(path):
         melody_notes, accomp_notes = parse_pop_song_accompaniment(song)
         if (melody_notes is None) or (accomp_notes is None):
             continue
-        song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes)
+
+        song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes,
+                                                     sequence_duration, vocab_size=vocab_size)
+
         dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
+    return dataset
 

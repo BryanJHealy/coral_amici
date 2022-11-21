@@ -12,3 +12,4 @@ src/util/lstm_basic
 *.pyc
 src/models/lstm_autoencoder
 src/models/training_checkpoints
+*~
