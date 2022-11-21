@@ -9,3 +9,6 @@ src/util/lstm_basic
 *.log
 *.tflite
 .idea/
+*.pyc
+src/models/lstm_autoencoder
+src/models/training_checkpoints

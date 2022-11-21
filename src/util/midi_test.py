@@ -255,11 +255,24 @@ if __name__ == '__main__':
     print(f'input shape: {input_shape}')
     learning_rate = 0.005
 
+    # inputs = tf.keras.Input(input_shape)
+    # # TODO: try different activation functions ('relu')
+    # encoder = tf.keras.layers.LSTM(128)(inputs)
+    # # decode1 = tf.keras.layers.Dense(128)(encoder)
+    # decode1 = tf.keras.layers.RepeatVector(seq_length)(encoder)
+    # decode2 = tf.keras.layers.LSTM(128, return_sequences=True)(decode1)
+    #
+    # outputs = {
+    #     'pitch': tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(128, name='pitch'))(decode2),
+    #     'step': tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1, name='step'))(decode2),
+    #     'duration': tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(1, name='duration'))(decode2),
+    # }
     inputs = tf.keras.Input(input_shape)
-    x = tf.keras.layers.LSTM(128)(inputs)
-    x1 = tf.keras.layers.Dense(128)(x)
-    x2 = tf.keras.layers.RepeatVector(3)(x1)
-    x3 = tf.keras.layers.LSTM(128, return_sequences=True)(x2)
+    # TODO: try different activation functions ('relu')
+    encoder = tf.keras.layers.LSTM(128)(inputs)
+    decode1 = tf.keras.layers.Dense(128)(encoder)
+    decode2 = tf.keras.layers.RepeatVector(3)(decode1)
+    x3 = tf.keras.layers.LSTM(128)(decode2)
 
     outputs = {
         'pitch': tf.keras.layers.Dense(128, name='pitch')(x3),
