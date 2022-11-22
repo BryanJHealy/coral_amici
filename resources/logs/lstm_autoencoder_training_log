@@ -1,0 +1,138 @@
+2022-11-19 21:44:40.835490: I tensorflow/core/platform/cpu_feature_guard.cc:151] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  SSE4.1 SSE4.2 AVX AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-11-19 21:44:40.836508: I tensorflow/core/common_runtime/process_util.cc:146] Creating new thread pool with default inter op setting: 2. Tune using inter_op_parallelism_threads for best performance.
+Model: "model"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to
+==================================================================================================
+ input_1 (InputLayer)           [(None, 25, 3)]      0           []
+
+ lstm (LSTM)                    (None, 128)          67584       ['input_1[0][0]']
+
+ repeat_vector (RepeatVector)   (None, 25, 128)      0           ['lstm[0][0]']
+
+ lstm_1 (LSTM)                  (None, 25, 128)      131584      ['repeat_vector[0][0]']
+
+ time_distributed_2 (TimeDistri  (None, 25, 1)       129         ['lstm_1[0][0]']
+ buted)
+
+ time_distributed (TimeDistribu  (None, 25, 128)     16512       ['lstm_1[0][0]']
+ ted)
+
+ time_distributed_1 (TimeDistri  (None, 25, 1)       129         ['lstm_1[0][0]']
+ buted)
+
+==================================================================================================
+Total params: 215,938
+Trainable params: 215,938
+Non-trainable params: 0
+__________________________________________________________________________________________________
+Epoch 1/50
+2022-11-19 21:44:52.580341: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:390] Filling up shuffle buffer (this may take a while): 278175 of 654047
+2022-11-19 21:45:02.580336: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:390] Filling up shuffle buffer (this may take a while): 563165 of 654047
+2022-11-19 21:45:05.766716: I tensorflow/core/kernels/data/shuffle_dataset_op.cc:415] Shuffle buffer filled.
+10219/10219 [==============================] - 526s 49ms/step - loss: 0.0844 - time_distributed_2_loss: 0.0416 - time_distributed_loss: 0.0013 - time_distributed_1_loss: 0.0415
+Epoch 2/50
+10219/10219 [==============================] - 503s 49ms/step - loss: 0.0715 - time_distributed_2_loss: 0.0358 - time_distributed_loss: 5.0456e-07 - time_distributed_1_loss: 0.0358
+Epoch 3/50
+10219/10219 [==============================] - 507s 50ms/step - loss: 0.0633 - time_distributed_2_loss: 0.0317 - time_distributed_loss: 4.8342e-09 - time_distributed_1_loss: 0.0317
+Epoch 4/50
+10219/10219 [==============================] - 505s 49ms/step - loss: 0.0579 - time_distributed_2_loss: 0.0290 - time_distributed_loss: 1.2151e-09 - time_distributed_1_loss: 0.0290
+Epoch 5/50
+10219/10219 [==============================] - 506s 50ms/step - loss: 0.0524 - time_distributed_2_loss: 0.0262 - time_distributed_loss: 3.7070e-10 - time_distributed_1_loss: 0.0262
+Epoch 6/50
+10219/10219 [==============================] - 512s 50ms/step - loss: 0.0473 - time_distributed_2_loss: 0.0236 - time_distributed_loss: 1.5821e-12 - time_distributed_1_loss: 0.0236
+Epoch 7/50
+10219/10219 [==============================] - 523s 51ms/step - loss: 0.0429 - time_distributed_2_loss: 0.0214 - time_distributed_loss: 2.4133e-12 - time_distributed_1_loss: 0.0214
+Epoch 8/50
+10219/10219 [==============================] - 516s 50ms/step - loss: 0.0397 - time_distributed_2_loss: 0.0198 - time_distributed_loss: 1.7936e-12 - time_distributed_1_loss: 0.0198
+Epoch 9/50
+10219/10219 [==============================] - 521s 51ms/step - loss: 0.0418 - time_distributed_2_loss: 0.0209 - time_distributed_loss: 1.5092e-12 - time_distributed_1_loss: 0.0209
+Epoch 10/50
+10219/10219 [==============================] - 523s 51ms/step - loss: 0.0357 - time_distributed_2_loss: 0.0178 - time_distributed_loss: 5.5411e-13 - time_distributed_1_loss: 0.0178
+Epoch 11/50
+10219/10219 [==============================] - 527s 52ms/step - loss: 0.0360 - time_distributed_2_loss: 0.0180 - time_distributed_loss: 4.8313e-08 - time_distributed_1_loss: 0.0180
+Epoch 12/50
+10219/10219 [==============================] - 516s 51ms/step - loss: 0.0320 - time_distributed_2_loss: 0.0160 - time_distributed_loss: 2.9164e-13 - time_distributed_1_loss: 0.0160
+Epoch 13/50
+10219/10219 [==============================] - 526s 52ms/step - loss: 0.0325 - time_distributed_2_loss: 0.0163 - time_distributed_loss: 4.8120e-13 - time_distributed_1_loss: 0.0163
+Epoch 14/50
+10219/10219 [==============================] - 524s 51ms/step - loss: 0.0311 - time_distributed_2_loss: 0.0155 - time_distributed_loss: 5.5411e-13 - time_distributed_1_loss: 0.0155
+Epoch 15/50
+10219/10219 [==============================] - 527s 52ms/step - loss: 0.0235 - time_distributed_2_loss: 0.0118 - time_distributed_loss: 1.0207e-13 - time_distributed_1_loss: 0.0118
+Epoch 16/50
+10219/10219 [==============================] - 537s 53ms/step - loss: 0.0281 - time_distributed_2_loss: 0.0140 - time_distributed_loss: 4.5204e-12 - time_distributed_1_loss: 0.0140
+Epoch 17/50
+10219/10219 [==============================] - 536s 52ms/step - loss: 0.0294 - time_distributed_2_loss: 0.0147 - time_distributed_loss: 3.7490e-11 - time_distributed_1_loss: 0.0147
+Epoch 18/50
+10219/10219 [==============================] - 530s 52ms/step - loss: 0.0206 - time_distributed_2_loss: 0.0103 - time_distributed_loss: 6.0515e-13 - time_distributed_1_loss: 0.0103
+Epoch 19/50
+10219/10219 [==============================] - 536s 52ms/step - loss: 0.0196 - time_distributed_2_loss: 0.0098 - time_distributed_loss: 6.2702e-13 - time_distributed_1_loss: 0.0098
+Epoch 20/50
+10219/10219 [==============================] - 533s 52ms/step - loss: 0.0167 - time_distributed_2_loss: 0.0083 - time_distributed_loss: 1.2322e-12 - time_distributed_1_loss: 0.0083
+Epoch 21/50
+10219/10219 [==============================] - 537s 53ms/step - loss: 0.0201 - time_distributed_2_loss: 0.0100 - time_distributed_loss: 6.6347e-13 - time_distributed_1_loss: 0.0100
+Epoch 22/50
+10219/10219 [==============================] - 535s 52ms/step - loss: 0.0152 - time_distributed_2_loss: 0.0076 - time_distributed_loss: 2.0779e-12 - time_distributed_1_loss: 0.0076
+Epoch 23/50
+10219/10219 [==============================] - 535s 52ms/step - loss: 0.0157 - time_distributed_2_loss: 0.0079 - time_distributed_loss: 1.8730e-10 - time_distributed_1_loss: 0.0079
+Epoch 24/50
+10219/10219 [==============================] - 537s 53ms/step - loss: 0.0163 - time_distributed_2_loss: 0.0081 - time_distributed_loss: 6.1477e-11 - time_distributed_1_loss: 0.0081
+Epoch 25/50
+10219/10219 [==============================] - 523s 51ms/step - loss: 0.0140 - time_distributed_2_loss: 0.0070 - time_distributed_loss: 1.3547e-11 - time_distributed_1_loss: 0.0070
+Epoch 26/50
+10219/10219 [==============================] - 532s 52ms/step - loss: 0.0125 - time_distributed_2_loss: 0.0063 - time_distributed_loss: 2.2893e-12 - time_distributed_1_loss: 0.0063
+Epoch 27/50
+10219/10219 [==============================] - 534s 52ms/step - loss: 0.0135 - time_distributed_2_loss: 0.0068 - time_distributed_loss: 7.5170e-12 - time_distributed_1_loss: 0.0068
+Epoch 28/50
+10219/10219 [==============================] - 544s 53ms/step - loss: 0.0177 - time_distributed_2_loss: 0.0088 - time_distributed_loss: 2.9601e-12 - time_distributed_1_loss: 0.0088
+Epoch 29/50
+10219/10219 [==============================] - 536s 52ms/step - loss: 0.0125 - time_distributed_2_loss: 0.0062 - time_distributed_loss: 2.4862e-12 - time_distributed_1_loss: 0.0062
+Epoch 30/50
+10219/10219 [==============================] - 537s 53ms/step - loss: 0.0099 - time_distributed_2_loss: 0.0049 - time_distributed_loss: 1.4582e-13 - time_distributed_1_loss: 0.0049
+Epoch 31/50
+10219/10219 [==============================] - 530s 52ms/step - loss: 0.0081 - time_distributed_2_loss: 0.0040 - time_distributed_loss: 2.9164e-14 - time_distributed_1_loss: 0.0040
+Epoch 32/50
+10219/10219 [==============================] - 541s 53ms/step - loss: 0.0085 - time_distributed_2_loss: 0.0043 - time_distributed_loss: 1.1665e-13 - time_distributed_1_loss: 0.0043
+Epoch 33/50
+10219/10219 [==============================] - 534s 52ms/step - loss: 0.0078 - time_distributed_2_loss: 0.0039 - time_distributed_loss: 5.1036e-14 - time_distributed_1_loss: 0.0039
+Epoch 34/50
+10219/10219 [==============================] - 535s 52ms/step - loss: 0.0065 - time_distributed_2_loss: 0.0033 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0033
+Epoch 35/50
+10219/10219 [==============================] - 540s 53ms/step - loss: 0.0065 - time_distributed_2_loss: 0.0032 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0032
+Epoch 36/50
+10219/10219 [==============================] - 538s 53ms/step - loss: 0.0045 - time_distributed_2_loss: 0.0022 - time_distributed_loss: 7.2909e-15 - time_distributed_1_loss: 0.0022
+Epoch 37/50
+10219/10219 [==============================] - 534s 52ms/step - loss: 0.0074 - time_distributed_2_loss: 0.0037 - time_distributed_loss: 7.2909e-15 - time_distributed_1_loss: 0.0037
+Epoch 38/50
+10219/10219 [==============================] - 539s 53ms/step - loss: 0.0099 - time_distributed_2_loss: 0.0049 - time_distributed_loss: 4.9578e-13 - time_distributed_1_loss: 0.0050
+Epoch 39/50
+10219/10219 [==============================] - 542s 53ms/step - loss: 0.0064 - time_distributed_2_loss: 0.0032 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0032
+Epoch 40/50
+10219/10219 [==============================] - 538s 53ms/step - loss: 0.0054 - time_distributed_2_loss: 0.0027 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0027
+Epoch 41/50
+10219/10219 [==============================] - 537s 53ms/step - loss: 0.0044 - time_distributed_2_loss: 0.0022 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0022
+Epoch 42/50
+10219/10219 [==============================] - 527s 52ms/step - loss: 0.0046 - time_distributed_2_loss: 0.0023 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0023
+Epoch 43/50
+10219/10219 [==============================] - 531s 52ms/step - loss: 0.0068 - time_distributed_2_loss: 0.0034 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0034
+Epoch 44/50
+10219/10219 [==============================] - 535s 52ms/step - loss: 0.0082 - time_distributed_2_loss: 0.0041 - time_distributed_loss: 2.1873e-14 - time_distributed_1_loss: 0.0041
+Epoch 45/50
+10219/10219 [==============================] - 528s 52ms/step - loss: 0.0041 - time_distributed_2_loss: 0.0021 - time_distributed_loss: 1.4582e-14 - time_distributed_1_loss: 0.0021
+Epoch 46/50
+10219/10219 [==============================] - 540s 53ms/step - loss: 0.0045 - time_distributed_2_loss: 0.0022 - time_distributed_loss: 0.0000e+00 - time_distributed_1_loss: 0.0022
+Epoch 47/50
+10219/10219 [==============================] - 532s 52ms/step - loss: 0.0042 - time_distributed_2_loss: 0.0021 - time_distributed_loss: 4.3745e-14 - time_distributed_1_loss: 0.0021
+Epoch 48/50
+10219/10219 [==============================] - 532s 52ms/step - loss: 0.0037 - time_distributed_2_loss: 0.0019 - time_distributed_loss: 2.9164e-14 - time_distributed_1_loss: 0.0019
+Epoch 49/50
+10219/10219 [==============================] - 539s 53ms/step - loss: 0.0037 - time_distributed_2_loss: 0.0018 - time_distributed_loss: 5.1036e-14 - time_distributed_1_loss: 0.0018
+Epoch 50/50
+10219/10219 [==============================] - 536s 52ms/step - loss: 0.0049 - time_distributed_2_loss: 0.0024 - time_distributed_loss: 5.1036e-14 - time_distributed_1_loss: 0.0024
+2022-11-20 05:21:25.846533: W tensorflow/python/util/util.cc:368] Sets are not currently considered sequences, but this may change in the future, so consider avoiding using them.
+WARNING:absl:Found untraced functions such as lstm_cell_layer_call_fn, lstm_cell_layer_call_and_return_conditional_losses, lstm_cell_1_layer_call_fn, lstm_cell_1_layer_call_and_return_conditional_losses while saving (showing 4 of 4). These functions will not be directly callable after loading.
+WARNING:absl:<keras.layers.recurrent.LSTMCell object at 0x7ffbaa6bb7f0> has the same name 'LSTMCell' as a built-in Keras object. Consider renaming <class 'keras.layers.recurrent.LSTMCell'> to avoid naming conflicts when loading with `tf.keras.models.load_model`. If renaming is not possible, pass the object in the `custom_objects` parameter of the load function.
+WARNING:absl:<keras.layers.recurrent.LSTMCell object at 0x7ffba95ae0a0> has the same name 'LSTMCell' as a built-in Keras object. Consider renaming <class 'keras.layers.recurrent.LSTMCell'> to avoid naming conflicts when loading with `tf.keras.models.load_model`. If renaming is not possible, pass the object in the `custom_objects` parameter of the load function.
+
+Process finished with exit code 0
