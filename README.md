@@ -49,6 +49,7 @@ operations on the TPU vs running a smaller model with more advanced operation on
     - GPU-based platforms (Nvidia Jetson, ...) -> much more versatile
 - Performance on Coral-supported applications (MobileNet, ...)
 - Ability to train on the edge device currently only supported by GPU/CPU 
+- Ability to reuse TFLite models on mobile
 
 # AI Music Iterative Composer Interface (AMICI)
 
