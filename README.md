@@ -104,3 +104,9 @@ operations on the TPU vs running a smaller model with more advanced operation on
     - Inference latency
 ### Demo Samples
 # References
+1. [https://www.tensorflow.org/tutorials/audio/music_generation](https://www.tensorflow.org/tutorials/audio/music_generation)
+2. [https://github.com/craffel/pretty-midi](https://github.com/craffel/pretty-midi)
+3. [https://magenta.tensorflow.org/music-vae](https://magenta.tensorflow.org/music-vae)
+4. [https://arxiv.org/pdf/1803.05428.pdf](https://arxiv.org/pdf/1803.05428.pdf)
+5. [https://github.com/music-x-lab/POP909-Dataset](https://github.com/music-x-lab/POP909-Dataset)
+6. [https://machinelearningmastery.com/lstm-autoencoders/](https://machinelearningmastery.com/lstm-autoencoders/)
