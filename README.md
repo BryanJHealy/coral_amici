@@ -94,6 +94,8 @@ operations on the TPU vs running a smaller model with more advanced operation on
     - Demonstrates that a simple LSTM layer is capable of learning how to represent a 25 note sequence
 - LSTM-based Encoder-Decoder
     - Training hyperparameters
+    - Transfer learning vs retraining decoder for accompaniment
+        - Freezing encoder weights
     - Training results
     - Select generated accompaniments
 ### Inference Evaluation
