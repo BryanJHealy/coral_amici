@@ -16,6 +16,7 @@ AI Music Iterative Composer Interface for Google Coral Dev Board
         - [lstm_autoencoder.py](src/models/lstm_autoencoder.py "lstm_autoencoder.py"): basic LSTM autoencoder designed to replicate a given MIDI track
     - [util](src/util "util directory"): directory containing miscellaneous files for data handling, data visualization, inference, etc...
         - [basic_inference_test.py](src/util/basic_inference_test.py "basic_inference_test.py"): runs inference of a converted model from basic.py on the Coral
+        - [***coral_converter.py***](src/util/coral_converter.py "coral_converter.py")*: serializes the given model, then converts it TFLite format using the Coral delegate
         - [***data_handling.py***](src/util/data_handling.py "data_handling.py")*: creates dataset from POP909 data for accompaniment generation
         - [midi_test.py](src/util/midi_test.py "midi_test.py"): tests various functions of the pretty_midi library. Trains, saves, and converts a test model to TFLite
         - [pop_visualization.py](src/util/pop_visualization.py "pop_visualization.py"): various functions to visualize the POP909 data

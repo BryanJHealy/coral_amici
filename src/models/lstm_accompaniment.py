@@ -10,22 +10,24 @@ from tensorflow.keras.layers import RepeatVector
 
 class LstmAccompaniment:
     def __init__(self, sequence_duration=15, sampling_frequency=60,
-                 vocab_size=128, learning_rate=0.005):
+                 vocab_size=128, learning_rate=0.005, compression_factor=2):
         samples_per_sequence = sequence_duration * sampling_frequency
-        input_shape = (samples_per_sequence, vocab_size)
+        # input_shape = (samples_per_sequence, vocab_size)
+        input_shape = (vocab_size, samples_per_sequence)
         # print(f'input shape: {input_shape}')
+        inner_size = int(samples_per_sequence/compression_factor)
 
         # TODO: try different activation functions ('relu')
         inputs = tf.keras.Input(input_shape)
-        encoder = LSTM(128)(inputs)
-        decode1 = RepeatVector(samples_per_sequence)(encoder)
-        decode2 = LSTM(128, return_sequences=True)(decode1)
-        outputs = TimeDistributed(Dense(vocab_size, name='active_pitches'))(decode2)
+        encoder = LSTM(inner_size)(inputs)  # 128
+        decode1 = RepeatVector(vocab_size)(encoder)
+        decode2 = LSTM(inner_size, return_sequences=True)(decode1)
+        outputs = TimeDistributed(Dense(samples_per_sequence, name='active_pitches'))(decode2)
 
         self.model = tf.keras.Model(inputs, outputs)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        self.model.compile(loss=tf.keras.losses.BinaryCrossentropy, optimizer=optimizer)
+        self.model.compile(loss=tf.keras.losses.binary_crossentropy, optimizer=optimizer)
         self.model.summary()
 
     def train(self, train_ds: tf.data.Dataset,

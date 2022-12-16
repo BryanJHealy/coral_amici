@@ -14,3 +14,5 @@ src/models/lstm_autoencoder
 src/models/training_checkpoints
 *~
 src/models/vae_port.py
+src/examples/lstm_accompaniment
+src/examples/training_checkpoints
