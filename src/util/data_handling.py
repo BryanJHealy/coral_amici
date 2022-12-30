@@ -1,11 +1,14 @@
+import os.path
+
 import pretty_midi
 import collections
 import pandas as pd
 import numpy as np
 from tensorflow import data as tfd
 from numpy import array
-# from os import listdir
 import glob
+from matplotlib import pyplot as plt
+from typing import Dict, List, Optional
 
 key_order = ['pitch', 'step', 'duration']
 
@@ -151,3 +154,51 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10):
             break
     return dataset
 
+
+def plot_piano_roll(notes: pd.DataFrame, count: Optional[int] = None):
+    if count:
+        title = f'First {count} notes'
+    else:
+        title = f'Whole track'
+        count = len(notes['pitch'])
+    plt.figure(figsize=(20, 4))
+    plot_pitch = np.stack([notes['pitch'], notes['pitch']], axis=0)
+    plot_start_stop = np.stack([notes['start'], notes['end']], axis=0)
+    plt.plot(
+        plot_start_stop[:, :count], plot_pitch[:, :count], color="b", marker=".")
+    plt.xlabel('Time [s]')
+    plt.ylabel('Pitch')
+    _ = plt.title(title)
+    plt.show()
+
+
+def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_notes: pd.DataFrame, out_file: str,
+                            velocity: int = 100,  # note loudness
+                            initial_tempo=80, melody_instrument=42,
+                            accomp_instrument=42, concat_sequential=True
+                            ) -> pretty_midi.PrettyMIDI:
+    acc_instrument = pretty_midi.Instrument(program=accomp_instrument, is_drum=False,
+                                            name='accompaniment')
+
+    prev_start = 0
+    for i, note in accomp_notes.iterrows():
+        start = float(prev_start + note['step'])
+        end = float(start + note['duration'])
+        note = pretty_midi.Note(
+            velocity=velocity,
+            pitch=int(note['pitch']),
+            start=start,
+            end=end,
+        )
+        acc_instrument.notes.append(note)
+        prev_start = start
+
+    pm.instruments.append(acc_instrument)
+    pm.write(out_file)
+    return pm
+
+def import_midi_sequence(path, seconds, offset):
+    pm = pretty_midi.PrettyMIDI(path)
+    sequence = pretty_midi.PrettyMIDI()
+
+    return pm
