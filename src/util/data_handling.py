@@ -172,7 +172,7 @@ def plot_piano_roll(notes: pd.DataFrame, count: Optional[int] = None):
     plt.show()
 
 
-def build_accompaniment_track(windows, instrument_num=42,
+def build_accompaniment_track(windows, instrument_num=33,
                             velocity: int = 100,  # note loudness
                             concat_sequential=True):
 
@@ -197,7 +197,7 @@ def build_accompaniment_track(windows, instrument_num=42,
 
 def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_windows, out_file: str,
                             velocity: int = 100,  # note loudness
-                            instrument_num=42, concat_sequential=True
+                            instrument_num=33, concat_sequential=True
                             ) -> pretty_midi.PrettyMIDI:
 
     acc_instrument = build_accompaniment_track(accomp_windows, instrument_num, velocity=velocity,
@@ -212,59 +212,37 @@ def midi_to_activation_sequence(song: pretty_midi.PrettyMIDI, seq_duration: floa
                                 instrument_track='MELODY',
                                 vocab_size=128, sample_frequency=60,
                                 offset=0, skip_leading_space=True):
-    pitch_col, start_col, end_col = 0, 1, 2
 
-    notes = None
+    sequence_samples = int(seq_duration * sample_frequency)
+
+    activation_seq = np.zeros((vocab_size, sequence_samples))
     for instrument_idx in range(len(song.instruments)):
         if song.instruments[instrument_idx].name == instrument_track:
-            notes = midi_to_notes(song, instrument_index=instrument_idx)
-            notes = np.stack([notes[key] for key in key_order], axis=1)
+            notes = sorted(song.instruments[instrument_idx].notes, key=lambda note: note.start)
 
-    def get_activation_tensor(note_events, sample_time, ds_idx):
-        activation = np.zeros(vocab_size)
-        for note_idx in range(ds_idx, len(note_events)):  # TODO check bounds
-            note = note_events[note_idx]
-            if note[start_col] <= sample_time:
-                if note[end_col] > sample_time:
-                    activation[int(note[pitch_col])] = 1.0  # TODO: vocab 0-based index?
+            # narrow note events down to sequence length from offset
+            started = False
+            seq_start = offset
+            end_time = offset + seq_duration
+            for note in notes:
+                if not started:
+                    if note.end >= offset:
+                        started = True
+                        if skip_leading_space:
+                            seq_start = max(offset, note.start)
+                            end_time = seq_start + seq_duration
+                    else:
+                        continue
                 else:
-                    ds_idx += 1  # increment index
-            else:
-                break
-        return activation, ds_idx
+                    if note.start > end_time:
+                        break  # outside of sequence scope
 
-    windows = []
-    mel_idx = 0
-    file_end_time = notes[-1][end_col]
-    file_samples = int(np.ceil(file_end_time * sample_frequency))
-    sequence_samples = seq_duration * sample_frequency
+                # NOTE: integer truncation of note start/end times shifts notes to previous sample
+                # with 1/sample_frequency resolution
+                start_col = int((note.start - seq_start) * sample_frequency)
+                end_col = min(int(note.end * sample_frequency), sequence_samples-1)
+                activation_seq[int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
 
-    window = np.zeros((vocab_size, sequence_samples))
-    for sample_num in range(file_samples):
-        sample_time = sample_num / sample_frequency
-        active_mel_pitches, mel_idx = get_activation_tensor(notes, sample_time, mel_idx)
+            break
 
-        if sample_num < sequence_samples:  # build entire first window
-            window[:, sample_num] = active_mel_pitches
-        else:  # shift windows by one sample
-            window = window[:, 1:]
-            window = np.append(window, active_mel_pitches)
-
-        windows.append(window)
-
-    return windows
-
-
-def import_midi_sequence(path, seconds, track='MELODY', offset=0, skip_leading_space=True):
-    song = pretty_midi.PrettyMIDI(path)
-
-    song_windows = midi_to_activation_sequence(song, seconds, instrument_track='MELODY',
-                                               vocab_size=128, sample_frequency=60,
-                                               offset=offset, skip_leading_space=skip_leading_space)
-
-    for instrument_idx in range(len(song.instruments)):
-        if song.instruments[instrument_idx].name == track:
-            melody_notes = midi_to_notes(song, instrument_index=instrument_idx)
-            melody_notes = np.stack([melody_notes[key] for key in key_order], axis=1)
-
-    return song_windows
+    return activation_seq
