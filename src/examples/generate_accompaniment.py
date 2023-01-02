@@ -1,21 +1,14 @@
-import pretty_midi
 from src.util import data_handling as dh
 import argparse
 import sys
 import tensorflow as tf
-import numpy as np
 
 if __name__ == '__main__':
-    # Command-line argument parsing for data path
     parser = argparse.ArgumentParser(description='Generate accompaniment for given MIDI melody')
-    parser.add_argument('--model_path', action='store',
-                        help='Path to the model')
-    parser.add_argument('--input', action='store',
-                        help='Path to the input .mid file')
-    parser.add_argument('--output', action='store',
-                        help='Path to the output .mid file')
-    parser.add_argument('--roll', action='store_true',
-                        help='create a piano roll png for the output generation')
+    parser.add_argument('--model_path', action='store', help='Path to the model')
+    parser.add_argument('--input', action='store', help='Path to the input .mid file')
+    parser.add_argument('--output', action='store', help='Path to the output .mid file')
+    parser.add_argument('--roll', action='store_true', help='create a piano roll png for the output generation')
     parameters = vars(parser.parse_args(sys.argv[1:]))
 
     # Load model
@@ -52,4 +45,4 @@ if __name__ == '__main__':
                                     concat_sequential=True)
 
     if parameters['roll']:
-        dh.plot_piano_roll(generated_seq)  # TODO: accept list of sequences to plot, use Instrument.get_piano_roll
+        dh.plot_piano_roll(pm, tracks=('MELODY', 'generation'))

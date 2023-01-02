@@ -155,26 +155,32 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10):
     return dataset
 
 
-def plot_piano_roll(notes: pd.DataFrame, count: Optional[int] = None):
-    if count:
-        title = f'First {count} notes'
-    else:
-        title = f'Whole track'
-        count = len(notes['pitch'])
+def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation')):
     plt.figure(figsize=(20, 4))
-    plot_pitch = np.stack([notes['pitch'], notes['pitch']], axis=0)
-    plot_start_stop = np.stack([notes['start'], notes['end']], axis=0)
-    plt.plot(
-        plot_start_stop[:, :count], plot_pitch[:, :count], color="b", marker=".")
+    colors = ['b', 'r', 'g', 'p']
+    plt_idx = 0
+    for instrument_idx in range(len(song.instruments)):
+        if song.instruments[instrument_idx].name in tracks:
+            notes = song.instruments[instrument_idx].notes
+            pitches, starts, stops = [], [], []
+            for note in notes:
+                pitches.append(note.pitch)
+                starts.append(note.start)
+                stops.append(note.end)
+            plot_pitch = np.stack([pitches, pitches], axis=0)
+            plot_start_stop = np.stack([starts, stops], axis=0)
+            plt.plot(plot_start_stop, plot_pitch, color=colors[plt_idx], marker="|",
+                     label=song.instruments[instrument_idx].name)
+            plt_idx += 1
     plt.xlabel('Time [s]')
     plt.ylabel('Pitch')
-    _ = plt.title(title)
+    _ = plt.title('Melody and Generated Accompaniment')
     plt.show()
 
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
                             sample_frequency=60, velocity=100,
-                            concat_sequential=True, activation_threshold=-.1):
+                            concat_sequential=True, activation_threshold=0.5):
 
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
                                             name='generation')
