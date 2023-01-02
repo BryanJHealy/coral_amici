@@ -21,28 +21,35 @@ if __name__ == '__main__':
     # Load model
     model = tf.keras.models.load_model(parameters['model_path'])
 
+    # Configure sequence
     sequence_seconds = 15
-    start_at_seconds = 0
-    skip_empty_intro = True
+    start_at_seconds = 0  # sequence start offset from beginning of file
+    skip_empty_intro = True  # sequence starts at first note after offset if True, else at offset
+    num_pitches = 128  # 0 to 127, representing the notes from C-1 to G9
+    samples_per_sec = 60  # data resolution
+    only_keep_melody_track = True  # build new MIDI file using only the melody track from the input file
 
     # Parse input midi file using PrettyMidi and collect list of input sequence windows
     try:
-        melody_pm = pretty_midi.PrettyMIDI(parameters['input'])
-        melody_seq = dh.midi_to_activation_sequence(melody_pm, sequence_seconds, instrument_track='MELODY',
-                                               vocab_size=128, sample_frequency=60,
-                                               offset=start_at_seconds, skip_leading_space=skip_empty_intro)
+        melody_seq, melody_pm = dh.import_midi_input_sequence(parameters['input'], sequence_seconds,
+                                                              instrument_track='MELODY', vocab_size=num_pitches,
+                                                              sample_frequency=samples_per_sec, offset=start_at_seconds,
+                                                              skip_leading_space=skip_empty_intro,
+                                                              isolate_track=only_keep_melody_track)
     except Exception as e:
         print(f'Unable to parse input file ({e}), exiting...')
         sys.exit(1)
 
-    melody_seq = np.expand_dims(melody_seq, axis=0)
     generated_seq = model.predict(melody_seq)
+
+    # acoustic bass, see https://fmslogo.sourceforge.io/manual/midi-instrument.html for instrument choices
+    accompaniment_instrument = 33
 
     pm = dh.add_accompaniment_track(melody_pm, generated_seq,
                                     parameters['output'],
                                     velocity=100,
-                                    instrument_num=33,
+                                    instrument_num=accompaniment_instrument,
                                     concat_sequential=True)
 
     if parameters['roll']:
-        dh.plot_piano_roll(generated_seq)
+        dh.plot_piano_roll(generated_seq)  # TODO: accept list of sequences to plot, use Instrument.get_piano_roll

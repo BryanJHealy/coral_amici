@@ -172,47 +172,60 @@ def plot_piano_roll(notes: pd.DataFrame, count: Optional[int] = None):
     plt.show()
 
 
-def build_accompaniment_track(windows, instrument_num=33,
-                            velocity: int = 100,  # note loudness
-                            concat_sequential=True):
+def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
+                            sample_frequency=60, velocity=100,
+                            concat_sequential=True, activation_threshold=-.1):
 
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
-                                            name='accompaniment')
-    prev_start = 0
-    # for i, note in accomp_notes.iterrows():
-    sequence = []  # TODO: stack windows horizontally
-    for sample in sequence:
-        start = float(prev_start + note['step'])
-        end = float(start + note['duration'])
-        note = pretty_midi.Note(
-            velocity=velocity,
-            pitch=int(note['pitch']),
-            start=start,
-            end=end,
-        )
-        instrument.notes.append(note)
-        prev_start = start
+                                            name='generation')
+
+    notes = [(-1,-1) for _ in range(128)]  # TODO: pass vocab size
+    active_notes = np.argwhere(sequence[0, :, :] >= activation_threshold)
+    sequence_end = sequence.shape[-1] / sample_frequency
+    for pitch, sample_idx in active_notes:
+        if notes[pitch] == (-1,-1):
+            notes[pitch] = (sample_idx, sample_idx)
+        else:
+            if notes[pitch][1] == sample_idx - 1:
+                notes[pitch] = (notes[pitch][0], sample_idx)
+            else:
+                note = pretty_midi.Note(velocity=velocity, pitch=pitch,
+                                        start=(notes[pitch][0] / sample_frequency),
+                                        end=(notes[pitch][1] / sample_frequency) + 1)
+                instrument.notes.append(note)
+                notes[pitch] = (sample_idx, sample_idx)
+
+    # create note for any non-repeating pitches
+    for pitch_idx in range(len(notes)):
+        if notes[pitch_idx] != (-1, -1):
+            note = pretty_midi.Note(velocity=velocity, pitch=pitch_idx,
+                                    start=(notes[pitch_idx][0] / sample_frequency),
+                                    end=(notes[pitch_idx][1] / sample_frequency) + 1)
+            instrument.notes.append(note)
+
     return instrument
 
 
-def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_windows, out_file: str,
+def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_seq, out_file: str,
                             velocity: int = 100,  # note loudness
                             instrument_num=33, concat_sequential=True
                             ) -> pretty_midi.PrettyMIDI:
 
-    acc_instrument = build_accompaniment_track(accomp_windows, instrument_num, velocity=velocity,
-                              concat_sequential=concat_sequential)
+    acc_instrument = build_accompaniment_track(accomp_seq, instrument_num, velocity=velocity,
+                                               concat_sequential=concat_sequential)
 
     pm.instruments.append(acc_instrument)
     pm.write(out_file)
     return pm
 
 
-def midi_to_activation_sequence(song: pretty_midi.PrettyMIDI, seq_duration: float,
-                                instrument_track='MELODY',
-                                vocab_size=128, sample_frequency=60,
-                                offset=0, skip_leading_space=True):
+def import_midi_input_sequence(filepath, seq_duration: float,
+                               instrument_track='MELODY',
+                               vocab_size=128, sample_frequency=60,
+                               offset=0, skip_leading_space=True,
+                               isolate_track=True):
 
+    song = pretty_midi.PrettyMIDI(filepath)
     sequence_samples = int(seq_duration * sample_frequency)
 
     activation_seq = np.zeros((vocab_size, sequence_samples))
@@ -224,10 +237,15 @@ def midi_to_activation_sequence(song: pretty_midi.PrettyMIDI, seq_duration: floa
             started = False
             seq_start = offset
             end_time = offset + seq_duration
-            for note in notes:
+            starting_note_idx = 0
+            ending_note_idx = 0
+            for note_idx in range(len(notes)):
+                note = notes[note_idx]
                 if not started:
                     if note.end >= offset:
                         started = True
+                        starting_note_idx = note_idx
+                        ending_note_idx = note_idx
                         if skip_leading_space:
                             seq_start = max(offset, note.start)
                             end_time = seq_start + seq_duration
@@ -236,13 +254,27 @@ def midi_to_activation_sequence(song: pretty_midi.PrettyMIDI, seq_duration: floa
                 else:
                     if note.start > end_time:
                         break  # outside of sequence scope
+                    else:
+                        ending_note_idx = note_idx
 
                 # NOTE: integer truncation of note start/end times shifts notes to previous sample
                 # with 1/sample_frequency resolution
-                start_col = int((note.start - seq_start) * sample_frequency)
-                end_col = min(int(note.end * sample_frequency), sequence_samples-1)
+                start_col = max(int((note.start - seq_start) * sample_frequency), 0)
+                end_col = min(int((note.end - seq_start) * sample_frequency), sequence_samples-1)
                 activation_seq[int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
 
+            if isolate_track:
+                # only keep indicated track
+                song.instruments = [song.instruments[instrument_idx]]
+
+                # only keep notes within sequence scope
+                song.instruments[0].notes = song.instruments[0].notes[starting_note_idx: ending_note_idx]
+
+                # shift notes to beginning of song and clip notes that extend outside sequence
+                for note in song.instruments[0].notes:
+                    note.start = max(0, note.start - seq_start)
+                    note.end = min(seq_duration, note.end - seq_start)
             break
 
-    return activation_seq
+    activation_seq = np.expand_dims(activation_seq, axis=0)  # add batch dimension
+    return activation_seq, song
