@@ -22,7 +22,8 @@ if __name__ == '__main__':
     sequence_duration = 15  # seconds per sequence
     sample_frequency = 4
     print('Building dataset...')
-    max_files = 20
+    max_files = 35
+    # TODO: shuffle files
     dataset = get_pop_data(parameters['data_root_path'], sequence_duration, max_files=max_files,
                            sampling_frequency=sample_frequency)
 

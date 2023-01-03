@@ -37,12 +37,14 @@ if __name__ == '__main__':
 
     # acoustic bass, see https://fmslogo.sourceforge.io/manual/midi-instrument.html for instrument choices
     accompaniment_instrument = 33
-
+    activation_threshold = 0.09
     pm = dh.add_accompaniment_track(melody_pm, generated_seq,
                                     parameters['output'],
                                     velocity=100,
                                     instrument_num=accompaniment_instrument,
-                                    concat_sequential=True)
+                                    concat_sequential=True,
+                                    sample_frequency=samples_per_sec,
+                                    activation_threshold=activation_threshold)
 
     if parameters['roll']:
         dh.plot_piano_roll(pm, tracks=('MELODY', 'generation'))

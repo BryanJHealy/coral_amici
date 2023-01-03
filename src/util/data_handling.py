@@ -185,7 +185,7 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
                             sample_frequency=60, velocity=100,
-                            concat_sequential=True, activation_threshold=0.0):
+                            concat_sequential=True, activation_threshold=0.8):
 
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
                                             name='generation')
@@ -219,11 +219,14 @@ def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
 
 def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_seq, out_file: str,
                             velocity: int = 100,  # note loudness
-                            instrument_num=33, concat_sequential=True
+                            instrument_num=33, concat_sequential=True,
+                            sample_frequency=60, activation_threshold=0.8
                             ) -> pretty_midi.PrettyMIDI:
 
     acc_instrument = build_accompaniment_track(accomp_seq, instrument_num, velocity=velocity,
-                                               concat_sequential=concat_sequential)
+                                               concat_sequential=concat_sequential,
+                                               sample_frequency=sample_frequency,
+                                               activation_threshold=activation_threshold)
 
     pm.instruments.append(acc_instrument)
     pm.write(out_file)
