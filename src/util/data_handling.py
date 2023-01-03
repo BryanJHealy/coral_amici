@@ -10,8 +10,6 @@ import glob
 from matplotlib import pyplot as plt
 from typing import Dict, List, Optional
 
-key_order = ['pitch', 'step', 'duration']
-
 
 def midi_to_notes(pm: pretty_midi.PrettyMIDI, instrument_index=0) -> pd.DataFrame:
     instrument = pm.instruments[instrument_index]
@@ -77,7 +75,7 @@ def create_sequences_for_accompaniment(
             note = note_events[note_idx]
             if note[start_col] <= sample_time:
                 if note[end_col] > sample_time:
-                    activation[int(note[pitch_col])] = 1.0  # TODO: vocab 0-based index?
+                    activation[int(note[pitch_col])] = 1.0
                 else:
                     ds_idx += 1  # increment dataset pointer
             else:
@@ -92,6 +90,8 @@ def create_sequences_for_accompaniment(
     file_end_time = max(melody_dataset[-1][end_col], accomp_dataset[-1][end_col])
     file_samples = int(np.ceil(file_end_time * sample_frequency))
     sequence_samples = seq_duration * sample_frequency
+    if file_samples < sequence_samples:
+        return None
 
     mel_window = np.zeros((vocab_size, sequence_samples))
     acc_window = np.zeros((vocab_size, sequence_samples))
@@ -103,11 +103,15 @@ def create_sequences_for_accompaniment(
         if sample_num < sequence_samples:  # build entire first window
             mel_window[:, sample_num] = active_mel_pitches
             acc_window[:, sample_num] = active_acc_pitches
+            if sample_num != sequence_samples - 1:
+                continue  # skip adding incomplete windows to dataset
         else:  # shift windows by one sample
             mel_window = mel_window[:, 1:]
             acc_window = acc_window[:, 1:]
-            mel_window = np.append(mel_window, active_mel_pitches)
-            acc_window = np.append(acc_window, active_acc_pitches)
+            active_mel_pitches = np.expand_dims(active_mel_pitches, axis=1)
+            active_acc_pitches = np.expand_dims(active_acc_pitches, axis=1)
+            mel_window = np.append(mel_window, active_mel_pitches, axis=1)
+            acc_window = np.append(acc_window, active_acc_pitches, axis=1)
 
         if mel_window.any() and acc_window.any():  # don't add data if either window is empty
             mel_windows.append(mel_window)
@@ -122,6 +126,7 @@ def parse_pop_song_accompaniment(filename):
     song = pretty_midi.PrettyMIDI(filename)
     melody_notes = None
     accomp_notes = None
+    key_order = ['pitch', 'start', 'end']
     for instrument_idx in range(len(song.instruments)):
         if song.instruments[instrument_idx].name == 'MELODY':
             melody_notes = midi_to_notes(song, instrument_index=instrument_idx)
@@ -134,7 +139,7 @@ def parse_pop_song_accompaniment(filename):
     return melody_notes, accomp_notes
 
 
-def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10):
+def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10, sampling_frequency=60):
     # TODO: use os to make cross-platform. Currently needs a '/' at end of path
     midi_files = glob.glob(str(f'{path}**/*.mid*'))
     dataset = None
@@ -145,10 +150,10 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10):
             if (melody_notes is None) or (accomp_notes is None):
                 continue
 
-            song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes,
-                                                         sequence_duration, vocab_size=vocab_size)
-
-            dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
+            song_ds = create_sequences_for_accompaniment(melody_notes, accomp_notes, sequence_duration,
+                                                         vocab_size=vocab_size, sample_frequency=sampling_frequency)
+            if song_ds is not None:
+                dataset = song_ds if dataset is None else dataset.concatenate(song_ds)
             num_processed += 1
         else:
             break
@@ -180,7 +185,7 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
                             sample_frequency=60, velocity=100,
-                            concat_sequential=True, activation_threshold=0.5):
+                            concat_sequential=True, activation_threshold=0.0):
 
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
                                             name='generation')

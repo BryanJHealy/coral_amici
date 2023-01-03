@@ -19,7 +19,7 @@ if __name__ == '__main__':
     start_at_seconds = 0  # sequence start offset from beginning of file
     skip_empty_intro = True  # sequence starts at first note after offset if True, else at offset
     num_pitches = 128  # 0 to 127, representing the notes from C-1 to G9
-    samples_per_sec = 60  # data resolution
+    samples_per_sec = 4  # data resolution
     only_keep_melody_track = True  # build new MIDI file using only the melody track from the input file
 
     # Parse input midi file using PrettyMidi and collect list of input sequence windows
