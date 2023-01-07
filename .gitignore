@@ -1,7 +1,9 @@
 env/
 milestones/
 .git/
-src/data/
+src/data/lakh
+src/data/maestro
+src/data/POP909
 src/.idea/
 src/util/training_checkpoints/
 src/util/lstm_basic
@@ -14,5 +16,5 @@ src/models/lstm_autoencoder
 src/models/training_checkpoints
 *~
 src/models/vae_port.py
-src/examples/lstm_accompaniment
+src/examples/lstm_accompaniment*
 src/examples/training_checkpoints
