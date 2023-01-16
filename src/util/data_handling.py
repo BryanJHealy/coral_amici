@@ -1,5 +1,3 @@
-import os.path
-
 import pretty_midi
 import collections
 import pandas as pd
@@ -8,7 +6,6 @@ from tensorflow import data as tfd
 from numpy import array
 import glob
 from matplotlib import pyplot as plt
-from typing import Dict, List, Optional
 
 
 def midi_to_notes(pm: pretty_midi.PrettyMIDI, instrument_index=0) -> pd.DataFrame:
@@ -184,17 +181,16 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
 
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
-                            sample_frequency=60, velocity=100,
-                            concat_sequential=True, activation_threshold=0.8):
-
+                              sample_frequency=60, velocity=100,
+                              concat_sequential=True, activation_threshold=0.8):
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
-                                            name='generation')
+                                        name='generation')
 
-    notes = [(-1,-1) for _ in range(128)]  # TODO: pass vocab size
+    notes = [(-1, -1) for _ in range(128)]  # TODO: pass vocab size
     active_notes = np.argwhere(sequence[0, :, :] >= activation_threshold)
     sequence_end = sequence.shape[-1] / sample_frequency
     for pitch, sample_idx in active_notes:
-        if notes[pitch] == (-1,-1):
+        if notes[pitch] == (-1, -1):
             notes[pitch] = (sample_idx, sample_idx)
         else:
             if notes[pitch][1] == sample_idx - 1:
@@ -222,7 +218,6 @@ def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_seq, out_file: st
                             instrument_num=33, concat_sequential=True,
                             sample_frequency=60, activation_threshold=0.8
                             ) -> pretty_midi.PrettyMIDI:
-
     acc_instrument = build_accompaniment_track(accomp_seq, instrument_num, velocity=velocity,
                                                concat_sequential=concat_sequential,
                                                sample_frequency=sample_frequency,
@@ -233,62 +228,132 @@ def add_accompaniment_track(pm: pretty_midi.PrettyMIDI, accomp_seq, out_file: st
     return pm
 
 
-def import_midi_input_sequence(filepath, seq_duration: float,
-                               instrument_track='MELODY',
-                               vocab_size=128, sample_frequency=60,
-                               offset=0, skip_leading_space=True,
-                               isolate_track=True):
-
-    song = pretty_midi.PrettyMIDI(filepath)
-    sequence_samples = int(seq_duration * sample_frequency)
-
-    activation_seq = np.zeros((vocab_size, sequence_samples))
+def sort_notes(song: pretty_midi.PrettyMIDI):
     for instrument_idx in range(len(song.instruments)):
-        if song.instruments[instrument_idx].name == instrument_track:
-            notes = sorted(song.instruments[instrument_idx].notes, key=lambda note: note.start)
+        song.instruments[instrument_idx].notes = \
+            sorted(song.instruments[instrument_idx].notes, key=lambda note: note.start)
+    return song
 
-            # narrow note events down to sequence length from offset
-            started = False
-            seq_start = offset
-            end_time = offset + seq_duration
-            starting_note_idx = 0
-            ending_note_idx = 0
-            for note_idx in range(len(notes)):
-                note = notes[note_idx]
-                if not started:
-                    if note.end >= offset:
-                        started = True
-                        starting_note_idx = note_idx
-                        ending_note_idx = note_idx
-                        if skip_leading_space:
-                            seq_start = max(offset, note.start)
-                            end_time = seq_start + seq_duration
-                    else:
-                        continue
+
+def get_activation_sequence(song: pretty_midi.PrettyMIDI, num_samples: int,
+                            instrument_idxs, vocab_size=128, sample_frequency=60,
+                            offset=0, starting_note_idxs=None, skip_leading_space=True,
+                            isolate_track=True, add_batch_dimension=True):
+    seq_duration = num_samples / float(sample_frequency)
+    activation_seq = np.zeros((vocab_size, num_samples))
+
+    if starting_note_idxs is None:
+        starting_note_idxs = {x: 0 for x in instrument_idxs}
+
+    last_note_reached = False
+
+    for instrument_idx in instrument_idxs:
+        # narrow note events down to sequence length from offset
+        started = False
+        seq_start = offset
+        end_time = offset + seq_duration
+        starting_note_idx = 0
+        ending_note_idx = 0
+        for note_idx in range(starting_note_idxs[instrument_idx], len(song.instruments[instrument_idx].notes)):
+            note = song.instruments[instrument_idx].notes[note_idx]
+            if not started:
+                if note.end >= offset:
+                    started = True
+                    starting_note_idx = note_idx
+                    ending_note_idx = note_idx
+                    if skip_leading_space:
+                        seq_start = max(offset, note.start)
+                        end_time = seq_start + seq_duration
+                    if note_idx == len(song.instruments[instrument_idx].notes) - 1:
+                        last_note_reached = True
                 else:
-                    if note.start > end_time:
-                        break  # outside of sequence scope
-                    else:
-                        ending_note_idx = note_idx
+                    continue
+            else:
+                if note.start > end_time:
+                    break  # outside of sequence scope
+                else:
+                    ending_note_idx = note_idx
+                    if note_idx == len(song.instruments[instrument_idx].notes) - 1:
+                        last_note_reached = True
 
-                # NOTE: integer truncation of note start/end times shifts notes to previous sample
-                # with 1/sample_frequency resolution
-                start_col = max(int((note.start - seq_start) * sample_frequency), 0)
-                end_col = min(int((note.end - seq_start) * sample_frequency), sequence_samples-1)
-                activation_seq[int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
+            # NOTE: integer truncation of note start/end times shifts notes to previous sample
+            # with 1/sample_frequency resolution
+            start_col = max(int((note.start - seq_start) * sample_frequency), 0)
+            end_col = min(int((note.end - seq_start) * sample_frequency), num_samples - 1)
+            activation_seq[int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
 
-            if isolate_track:
-                # only keep indicated track
-                song.instruments = [song.instruments[instrument_idx]]
+        if isolate_track:  # TODO: work with multiple instrument tracks
+            # only keep indicated track
+            song.instruments = [song.instruments[instrument_idx]]
 
-                # only keep notes within sequence scope
-                song.instruments[0].notes = song.instruments[0].notes[starting_note_idx: ending_note_idx]
+            # only keep notes within sequence scope
+            song.instruments[0].notes = song.instruments[0].notes[starting_note_idx: ending_note_idx]
 
-                # shift notes to beginning of song and clip notes that extend outside sequence
-                for note in song.instruments[0].notes:
-                    note.start = max(0, note.start - seq_start)
-                    note.end = min(seq_duration, note.end - seq_start)
-            break
+            # shift notes to beginning of song and clip notes that extend outside sequence
+            for note in song.instruments[0].notes:
+                note.start = max(0, note.start - seq_start)
+                note.end = min(seq_duration, note.end - seq_start)
 
-    activation_seq = np.expand_dims(activation_seq, axis=0)  # add batch dimension
+    if add_batch_dimension:
+        activation_seq = np.expand_dims(activation_seq, axis=0)  # add batch dimension
+    return activation_seq, song, last_note_reached
+
+
+def get_instrument_idxs(song: pretty_midi.PrettyMIDI, instrument_names=('MELODY', 'PIANO')):
+    instrument_idxs_dict = {}
+    for instrument_idx in range(len(song.instruments)):
+        if song.instruments[instrument_idx].name in instrument_names:
+            instrument_idxs_dict[song.instruments[instrument_idx].name] = instrument_idx
+    return (instrument_idxs_dict[name] for name in instrument_names)
+
+
+def generate_training_sequences(filepath, instrument_tracks=('MELODY', 'PIANO'), vocab_size=128,
+                                num_samples=960, sample_frequencies=(4, 8, 16, 32, 64),
+                                add_batch_dimension=False):
+    song = pretty_midi.PrettyMIDI(filepath)
+    song = sort_notes(song)
+    instrument_idxs = get_instrument_idxs(song, instrument_names=instrument_tracks)
+    note_idxs = {inst_idx: 0 for inst_idx in instrument_idxs}
+    training_pairs = []
+    end = max([song.instruments[i_idx].notes[-1].end] for i_idx in instrument_idxs)
+    # TODO: update -1 above to find note with latest end
+    for frequency in sample_frequencies:
+        sequence_duration = num_samples / float(frequency)
+        # iterate over notes in melody
+        valid = True
+        last_note_reached = False
+        while (not last_note_reached) and valid:
+            activation_seqs, _, last_note_reached = get_activation_sequence(song, num_samples=num_samples,
+                                                        instrument_idxs=instrument_idxs,
+                                                        vocab_size=vocab_size, sample_frequency=frequency,
+                                                        offset=0, skip_leading_space=True,
+                                                        starting_note_idxs=note_idxs, isolate_track=False,
+                                                        add_batch_dimension=add_batch_dimension)
+            for seq in activation_seqs:
+                if not np.any(seq):
+                    valid = False
+                    break
+
+            if valid:
+                training_pairs.append(tuple(activation_seqs))
+                for i_idx in instrument_idxs:
+                    note_idxs[i_idx] += 1
+
+    return training_pairs
+
+
+def import_midi_input_sequence(filepath, num_samples: int, instrument_tracks=('MELODY', 'PIANO'),
+                               vocab_size=128, sample_frequency=60, offset=0,
+                               skip_leading_space=True, isolate_track=True,
+                               add_batch_dimension=True):
+    song = pretty_midi.PrettyMIDI(filepath)
+    song = sort_notes(song)
+    instrument_idxs = get_instrument_idxs(song, instrument_names=instrument_tracks)
+
+    activation_seq, song, _ = get_activation_sequence(song, num_samples=num_samples,
+                                                   instrument_idxs=instrument_idxs,
+                                                   vocab_size=vocab_size, sample_frequency=sample_frequency,
+                                                   offset=offset, skip_leading_space=skip_leading_space,
+                                                   isolate_track=isolate_track,
+                                                   add_batch_dimension=add_batch_dimension)
     return activation_seq, song
