@@ -2,7 +2,11 @@
 
 import tensorflow_datasets as tfds
 import os
-from ...util.data_handling import generate_training_sequences
+# import sys
+# sys.path.insert(0, '/media/steamgames/coral/coral_amici/src')
+import util.data_handling as dh
+from tensorflow import float64
+
 
 VERSION = tfds.core.Version("0.1.0")
 
@@ -60,8 +64,8 @@ class QuantizedPop(tfds.core.GeneratorBasedBuilder):
         return self.dataset_info_from_configs(
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
-                'melody': tfds.features.Tensor(shape=(128, 900, None)),
-                'accompaniment': tfds.features.Tensor(shape=(128, 900, None)),
+                'melody': tfds.features.Tensor(shape=(1, 128, 960), dtype=float64),
+                'accompaniment': tfds.features.Tensor(shape=(1, 128, 960), dtype=float64),
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -93,10 +97,10 @@ class QuantizedPop(tfds.core.GeneratorBasedBuilder):
             sample_frequencies = self._builder_config.sample_frequencies
             num_samples = self._builder_config.num_samples
             vocab_size = self._builder_config.vocab_size
-            sequences = generate_training_sequences(filepath=os.path.join(path, song_num, f'{song_num}.mid'),
-                                                    instrument_tracks=('MELODY', 'PIANO'), num_samples=num_samples,
-                                                    sample_frequencies=sample_frequencies, vocab_size=vocab_size,
-                                                    add_batch_dimension=True)
+            fpath = os.path.join(path, 'POP909', f'{song_num:03d}', f'{song_num:03d}.mid')
+            sequences = dh.generate_training_sequences(filepath=fpath, instrument_tracks=('MELODY', 'PIANO'),
+                                                       num_samples=num_samples, sample_frequencies=sample_frequencies,
+                                                       vocab_size=vocab_size, add_batch_dimension=True)
             for seq_idx in range(len(sequences)):
                 key = f'{song_num}_{seq_idx}'
                 yield key, {

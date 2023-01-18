@@ -240,7 +240,7 @@ def get_activation_sequence(song: pretty_midi.PrettyMIDI, num_samples: int,
                             offset=0, starting_note_idxs=None, skip_leading_space=True,
                             isolate_track=True, add_batch_dimension=True):
     seq_duration = num_samples / float(sample_frequency)
-    activation_seq = np.zeros((vocab_size, num_samples))
+    activation_seqs = {idx: np.zeros((vocab_size, num_samples)) for idx in instrument_idxs}
 
     if starting_note_idxs is None:
         starting_note_idxs = {x: 0 for x in instrument_idxs}
@@ -280,7 +280,7 @@ def get_activation_sequence(song: pretty_midi.PrettyMIDI, num_samples: int,
             # with 1/sample_frequency resolution
             start_col = max(int((note.start - seq_start) * sample_frequency), 0)
             end_col = min(int((note.end - seq_start) * sample_frequency), num_samples - 1)
-            activation_seq[int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
+            activation_seqs[instrument_idx][int(note.pitch), start_col:end_col] = 1.0  # activate corresponding note
 
         if isolate_track:  # TODO: work with multiple instrument tracks
             # only keep indicated track
@@ -295,8 +295,9 @@ def get_activation_sequence(song: pretty_midi.PrettyMIDI, num_samples: int,
                 note.end = min(seq_duration, note.end - seq_start)
 
     if add_batch_dimension:
-        activation_seq = np.expand_dims(activation_seq, axis=0)  # add batch dimension
-    return activation_seq, song, last_note_reached
+        for i_idx in instrument_idxs:
+            activation_seqs[i_idx] = np.expand_dims(activation_seqs[i_idx], axis=0)  # add batch dimension
+    return activation_seqs, song, last_note_reached
 
 
 def get_instrument_idxs(song: pretty_midi.PrettyMIDI, instrument_names=('MELODY', 'PIANO')):
@@ -304,7 +305,7 @@ def get_instrument_idxs(song: pretty_midi.PrettyMIDI, instrument_names=('MELODY'
     for instrument_idx in range(len(song.instruments)):
         if song.instruments[instrument_idx].name in instrument_names:
             instrument_idxs_dict[song.instruments[instrument_idx].name] = instrument_idx
-    return (instrument_idxs_dict[name] for name in instrument_names)
+    return tuple(instrument_idxs_dict[name] for name in instrument_names)
 
 
 def generate_training_sequences(filepath, instrument_tracks=('MELODY', 'PIANO'), vocab_size=128,
@@ -329,20 +330,20 @@ def generate_training_sequences(filepath, instrument_tracks=('MELODY', 'PIANO'),
                                                         offset=0, skip_leading_space=True,
                                                         starting_note_idxs=note_idxs, isolate_track=False,
                                                         add_batch_dimension=add_batch_dimension)
-            for seq in activation_seqs:
-                if not np.any(seq):
+            for seq_key in activation_seqs.keys():
+                if not np.any(activation_seqs[seq_key]):
                     valid = False
                     break
 
             if valid:
-                training_pairs.append(tuple(activation_seqs))
+                training_pairs.append((activation_seqs[instrument_idxs[0]], activation_seqs[instrument_idxs[1]]))
                 for i_idx in instrument_idxs:
                     note_idxs[i_idx] += 1
 
     return training_pairs
 
 
-def import_midi_input_sequence(filepath, num_samples: int, instrument_tracks=('MELODY', 'PIANO'),
+def import_midi_input_sequence(filepath, num_samples: int, instrument_tracks=('MELODY',),
                                vocab_size=128, sample_frequency=60, offset=0,
                                skip_leading_space=True, isolate_track=True,
                                add_batch_dimension=True):
@@ -350,10 +351,11 @@ def import_midi_input_sequence(filepath, num_samples: int, instrument_tracks=('M
     song = sort_notes(song)
     instrument_idxs = get_instrument_idxs(song, instrument_names=instrument_tracks)
 
-    activation_seq, song, _ = get_activation_sequence(song, num_samples=num_samples,
+    activation_seqs, song, _ = get_activation_sequence(song, num_samples=num_samples,
                                                    instrument_idxs=instrument_idxs,
                                                    vocab_size=vocab_size, sample_frequency=sample_frequency,
                                                    offset=offset, skip_leading_space=skip_leading_space,
                                                    isolate_track=isolate_track,
                                                    add_batch_dimension=add_batch_dimension)
+    activation_seq = activation_seqs[instrument_idxs[0]]
     return activation_seq, song
