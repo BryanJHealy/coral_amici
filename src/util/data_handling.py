@@ -238,7 +238,7 @@ def sort_notes(song: pretty_midi.PrettyMIDI):
 def get_activation_sequence(song: pretty_midi.PrettyMIDI, num_samples: int,
                             instrument_idxs, vocab_size=128, sample_frequency=60,
                             offset=0, starting_note_idxs=None, skip_leading_space=True,
-                            isolate_track=True, add_batch_dimension=True):
+                            isolate_track=True, add_batch_dimension=False):
     seq_duration = num_samples / float(sample_frequency)
     activation_seqs = {idx: np.zeros((vocab_size, num_samples)) for idx in instrument_idxs}
 

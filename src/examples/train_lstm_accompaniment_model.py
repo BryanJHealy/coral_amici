@@ -1,48 +1,37 @@
-import argparse
-import sys
+# import argparse
 import tensorflow as tf
 import numpy as np
-from src.util.data_handling import get_pop_data
 from src.models.lstm_accompaniment import LstmAccompaniment
+import tensorflow_datasets as tfds
 
 
 if __name__ == '__main__':
-    # Command-line argument parsing for data path
-    parser = argparse.ArgumentParser(description='Transcribe Audio file to MIDI file')
-    parser.add_argument('data_root_path', action='store',
-                        help='Path to the POP909 root folder, end with \"/\"')
-    parameters = vars(parser.parse_args(sys.argv[1:]))
+    # Command-line argument parsing
+    # parser = argparse.ArgumentParser(description='Build quantized_pop if needed, then use it to train LSTM '
+    #                                              'autoencoder to generate accompaniments for a given melody')
 
     seed = 42
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-    # TODO: use path libraries
-    # TODO: add verbose flags
-    sequence_duration = 15  # seconds per sequence
-    sample_frequency = 4
-    print('Building dataset...')
-    max_files = 35
-    # TODO: shuffle files
-    dataset = get_pop_data(parameters['data_root_path'], sequence_duration, max_files=max_files,
-                           sampling_frequency=sample_frequency)
-
+    samples_per_sequence = 240  # see src/data/QuantizedPop.BUILDER_CONFIGS for configurations
     batch_size = 64
-    buffer_size = dataset.cardinality().numpy()  # the number of items in the dataset
-    train_ds = (dataset
-                .shuffle(buffer_size)
-                .batch(batch_size, drop_remainder=True)
-                .cache()
-                .prefetch(tf.data.experimental.AUTOTUNE))
 
-    # print(train_ds.element_spec)
+    print('Loading dataset...')
+    train_ds = tfds.load(f'quantized_pop/s{samples_per_sequence}', split='train[:5%]',
+                         shuffle_files=True, as_supervised=True)
 
     print('Building model...')
-    model = LstmAccompaniment(sequence_duration=15, sampling_frequency=sample_frequency, learning_rate=0.005)
+    model = LstmAccompaniment(samples_per_sequence=samples_per_sequence, learning_rate=0.005)
+
     print('Training model...')
-    model.train(train_ds=train_ds, epochs=50)
+    model.train(train_ds=train_ds, batch_size=batch_size, epochs=50)
+
     print('Saving model...')
     model.save()
+
     print('Evaluating model...')
-    model.evaluate(train_ds)  # TODO: separate an eval set
+    eval_ds = tfds.load(f'quantized_pop/s{samples_per_sequence}', split='train[5:6%]',
+                        shuffle_files=True, as_supervised=True)  # TODO: check if shuffling will occur between loads
+    model.evaluate(train_ds)
     print('Done.')

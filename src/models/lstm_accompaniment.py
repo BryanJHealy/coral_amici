@@ -9,21 +9,15 @@ from tensorflow.keras.layers import RepeatVector
 
 
 class LstmAccompaniment:
-    def __init__(self, sequence_duration=15, sampling_frequency=60,
-                 vocab_size=128, learning_rate=0.005, compression_factor=2):
-        samples_per_sequence = sequence_duration * sampling_frequency
-        # input_shape = (samples_per_sequence, vocab_size)
+    def __init__(self, samples_per_sequence=240, vocab_size=128, learning_rate=0.005, compression_factor=2):
         input_shape = (vocab_size, samples_per_sequence)
-        # print(f'input shape: {input_shape}')
         inner_size = int(samples_per_sequence/compression_factor)
 
-        # TODO: try different activation functions ('relu')
-        inputs = tf.keras.Input(input_shape)
-        encoder = LSTM(inner_size)(inputs)  # 128
+        inputs = tf.keras.layers.Input(input_shape)
+        encoder = LSTM(inner_size)(inputs)
         decode1 = RepeatVector(vocab_size)(encoder)
         decode2 = LSTM(inner_size, return_sequences=True)(decode1)
         outputs = TimeDistributed(Dense(samples_per_sequence, name='active_pitches'))(decode2)
-
         self.model = tf.keras.Model(inputs, outputs)
 
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -32,7 +26,8 @@ class LstmAccompaniment:
 
     def train(self, train_ds: tf.data.Dataset,
               epochs: int,
-              ckpt_path='./training_checkpoints/ckpt_{epoch}'):
+              ckpt_path='./training_checkpoints/ckpt_{epoch}',
+              batch_size=64):
 
         callbacks = [
             tf.keras.callbacks.ModelCheckpoint(
@@ -47,9 +42,11 @@ class LstmAccompaniment:
 
         history = self.model.fit(
             train_ds,
+            batch_size=batch_size,
             epochs=epochs,
             callbacks=callbacks,
         )
+        pass
 
     def evaluate(self, eval_ds: tf.data.Dataset):
         losses = self.model.evaluate(eval_ds, return_dict=True)
