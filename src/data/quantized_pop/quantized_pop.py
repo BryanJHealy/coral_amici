@@ -55,6 +55,20 @@ class QuantizedPop(tfds.core.GeneratorBasedBuilder):
             vocab_size=128
         ),
         PopConfig(
+            name="s60",
+            description="60 samples per sequence",
+            num_samples=60,
+            sample_frequencies=[4,8],
+            vocab_size=128
+        ),
+        PopConfig(
+            name="s15",
+            description="15 samples per sequence",
+            num_samples=15,
+            sample_frequencies=[1],
+            vocab_size=128
+        ),
+        PopConfig(
             name="s3840",
             description="3840 samples per sequence",
             num_samples=3840,

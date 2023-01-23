@@ -19,13 +19,13 @@ if __name__ == '__main__':
     start_at_seconds = 0  # sequence start offset from beginning of file
     skip_empty_intro = True  # sequence starts at first note after offset if True, else at offset
     num_pitches = 128  # 0 to 127, representing the notes from C-1 to G9
-    samples_per_sec = 4  # data resolution
+    samples_per_sec = 1  # data resolution
     only_keep_melody_track = True  # build new MIDI file using only the melody track from the input file
 
     # Parse input midi file using PrettyMidi and collect list of input sequence windows
     try:
         melody_seq, melody_pm = dh.import_midi_input_sequence(parameters['input'], sequence_seconds,
-                                                              instrument_track='MELODY', vocab_size=num_pitches,
+                                                              instrument_tracks=('MELODY',), vocab_size=num_pitches,
                                                               sample_frequency=samples_per_sec, offset=start_at_seconds,
                                                               skip_leading_space=skip_empty_intro,
                                                               isolate_track=only_keep_melody_track)
@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # acoustic bass, see https://fmslogo.sourceforge.io/manual/midi-instrument.html for instrument choices
     accompaniment_instrument = 33
-    activation_threshold = 0.09
+    activation_threshold = 0.0
     pm = dh.add_accompaniment_track(melody_pm, generated_seq,
                                     parameters['output'],
                                     velocity=100,
