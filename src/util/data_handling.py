@@ -3,9 +3,57 @@ import collections
 import pandas as pd
 import numpy as np
 from tensorflow import data as tfd
+from tensorflow.keras.losses import Loss
+# from tensorflow.keras.losses import LossFunctionWrapper
+import tensorflow as tf
 from numpy import array
 import glob
 from matplotlib import pyplot as plt
+
+# tf.config.run_functions_eagerly(True)
+
+
+class SequenceLoss(Loss):
+    def __init__(self, threshold=0.5):
+        super().__init__()
+        self.threshold = threshold
+
+    def call(self, y_true, y_pred):
+        # log_y_pred = tf.math.log(y_pred)
+        # elements = -tf.math.multiply_no_nan(x=log_y_pred, y=y_true)
+        # return tf.reduce_mean(tf.reduce_sum(elements,axis=1))
+
+        # converted predicted to boolean using threshold
+        # y_pred = tf.where(y_pred > self.threshold, 1, 0)
+        # (false positives + false negatives) = predicted XOR actual
+        # errors = tf.math.logical_xor(y_pred.numpy(), y_true.numpy())
+        # sum((false positives + false negatives) / vocab) / samples
+        # num_errors = len(tf.where())
+        # = no. 1s in XOR / (vocab * samples)
+        # ---
+        # r1 = tf.where(y_true > 0.5)
+        # r2 = tf.where(y_pred > 0.5)
+        # total = y_true.shape[1] + y_true.shape[2]
+        # r4 = r3.numpy().flatten()
+        # return len(r4) / total
+        # y_pred_bool = tf.where(y_pred > 0.5, 1.0, 0.0)
+        # a = tf.math.greater_equal(y_pred, tf.constant(0.5))
+        a = tf.cast(y_pred, tf.bool)
+        a1 = y_pred.numpy()
+        b = tf.where(y_true > 0.5)
+        y_pred_bool = tf.where(y_pred > 0.5, True, False)
+        y_true_bool = tf.where(y_pred > 0.5, True, False)
+        xor_bool = tf.math.logical_xor(y_pred_bool, y_true_bool)
+        xor = tf.where(xor_bool is True, 1.0, 0.0)
+        unique = tf.reduce_sum(xor)
+        total_active = tf.reduce_sum(y_pred_bool) + tf.reduce_sum(y_true)
+        # correct = tf.where(y_pred_bool == y_true)
+        # incorrect = tf.where(y_pred_bool != y_true, 1.0, 0.0)
+        # loss = tf.convert_to_tensor(1 - (correct/(correct + incorrect)))
+        loss = tf.math.subtract(1, tf.math.divide(tf.subtract(total_active, tf.math.multiply(unique, 2)), unique))
+        # loss = tf.convert_to_tensor(1 - ((total_active - (2 * unique)) / unique))
+        return loss
+        # return tf.losses.binary_crossentropy(y_true=y_true, y_pred=y_pred)
 
 
 def midi_to_notes(pm: pretty_midi.PrettyMIDI, instrument_index=0) -> pd.DataFrame:
@@ -310,33 +358,53 @@ def get_instrument_idxs(song: pretty_midi.PrettyMIDI, instrument_names=('MELODY'
 
 def generate_training_sequences(filepath, instrument_tracks=('MELODY', 'PIANO'), vocab_size=128,
                                 num_samples=960, sample_frequencies=(4, 8, 16, 32, 64),
-                                add_batch_dimension=False):
+                                binary_activations=False, add_batch_dimension=False):
     song = pretty_midi.PrettyMIDI(filepath)
     song = sort_notes(song)
     instrument_idxs = get_instrument_idxs(song, instrument_names=instrument_tracks)
     note_idxs = {inst_idx: 0 for inst_idx in instrument_idxs}
     training_pairs = []
-    end = max([song.instruments[i_idx].notes[-1].end] for i_idx in instrument_idxs)
+    # end = max([song.instruments[i_idx].notes[-1].end] for i_idx in instrument_idxs)
     # TODO: update -1 above to find note with latest end
+
+    reduction_matrix = None
+    packed_size = 0
+    if binary_activations:
+        reduction_matrix, packed_size = get_activation_reduction_matrix(data_size=32, vocab_size=vocab_size)
+
     for frequency in sample_frequencies:
-        sequence_duration = num_samples / float(frequency)
+        # sequence_duration = num_samples / float(frequency)
         # iterate over notes in melody
         valid = True
         last_note_reached = False
         while (not last_note_reached) and valid:
             activation_seqs, _, last_note_reached = get_activation_sequence(song, num_samples=num_samples,
-                                                        instrument_idxs=instrument_idxs,
-                                                        vocab_size=vocab_size, sample_frequency=frequency,
-                                                        offset=0, skip_leading_space=True,
-                                                        starting_note_idxs=note_idxs, isolate_track=False,
-                                                        add_batch_dimension=add_batch_dimension)
+                                                                            instrument_idxs=instrument_idxs,
+                                                                            vocab_size=vocab_size,
+                                                                            sample_frequency=frequency,
+                                                                            offset=0, skip_leading_space=True,
+                                                                            starting_note_idxs=note_idxs,
+                                                                            isolate_track=False,
+                                                                            add_batch_dimension=add_batch_dimension)
             for seq_key in activation_seqs.keys():
                 if not np.any(activation_seqs[seq_key]):
                     valid = False
                     break
 
             if valid:
-                training_pairs.append((activation_seqs[instrument_idxs[0]], activation_seqs[instrument_idxs[1]]))
+                mel_activation = activation_seqs[instrument_idxs[0]]
+                acc_activation = activation_seqs[instrument_idxs[1]]
+
+                if binary_activations:
+                    mel_activation = reduce_activation(mel_activation, reduction_matrix=reduction_matrix,
+                                                       data_size=32, packed_size=packed_size)
+                    acc_activation = reduce_activation(acc_activation, reduction_matrix=reduction_matrix,
+                                                       data_size=32, packed_size=packed_size)
+
+                if len(mel_activation.shape) == 4:
+                    training_pairs.append((mel_activation[0], acc_activation[0]))
+                else:
+                    training_pairs.append((mel_activation, acc_activation))
                 for i_idx in instrument_idxs:
                     note_idxs[i_idx] += 1
 
@@ -352,10 +420,23 @@ def import_midi_input_sequence(filepath, num_samples: int, instrument_tracks=('M
     instrument_idxs = get_instrument_idxs(song, instrument_names=instrument_tracks)
 
     activation_seqs, song, _ = get_activation_sequence(song, num_samples=num_samples,
-                                                   instrument_idxs=instrument_idxs,
-                                                   vocab_size=vocab_size, sample_frequency=sample_frequency,
-                                                   offset=offset, skip_leading_space=skip_leading_space,
-                                                   isolate_track=isolate_track,
-                                                   add_batch_dimension=add_batch_dimension)
+                                                       instrument_idxs=instrument_idxs,
+                                                       vocab_size=vocab_size, sample_frequency=sample_frequency,
+                                                       offset=offset, skip_leading_space=skip_leading_space,
+                                                       isolate_track=isolate_track,
+                                                       add_batch_dimension=add_batch_dimension)
     activation_seq = activation_seqs[instrument_idxs[0]]
     return activation_seq, song
+
+
+def get_activation_reduction_matrix(data_size=32, vocab_size=128):
+    # TODO: check order of powers(ascend/descend) -- endianness doesn't matter as long as consistent
+    packed_size = vocab_size // data_size  # TODO: check non-zero remainder behavior
+    powers = [2 ** idx for idx in range(data_size)]
+    # powers = powers * packed_size
+    powers = np.array(powers)
+    return powers, packed_size
+
+
+def reduce_activation(activation, reduction_matrix, data_size, packed_size):
+    return np.expand_dims(np.array([reduction_matrix @ (activation[0, idx * data_size:(idx + 1) * data_size, :]) for idx in range(packed_size)]), axis=0)

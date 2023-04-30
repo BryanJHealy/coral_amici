@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
-    ds = tfds.load('quantized_pop_0/s960', split='train', shuffle_files=True)
+    ds = tfds.load('quantized_pop/s960b', split='train', shuffle_files=True)
     examples = ds.take(10)
     for example in examples:
         a = example['accompaniment']

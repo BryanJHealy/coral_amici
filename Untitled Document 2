@@ -1,0 +1,38 @@
+BaseModel
+events_rnn_model.EventSequenceRnnModel
+MelodyRnnModel()
+
+
+  config = melody_rnn_config_flags.config_from_flags()
+
+  mode = 'eval' if FLAGS.eval else 'train'
+  build_graph_fn = events_rnn_graph.get_build_graph_fn(
+      mode, config, sequence_example_file_paths)
+  
+  events_rnn_train.run_training(build_graph_fn, train_dir,
+                                  FLAGS.num_training_steps,
+                                  FLAGS.summary_frequency,
+                 checkpoints_to_keep=FLAGS.num_checkpoints)
+
+
+    'attention_rnn':
+        MelodyRnnConfig(
+            generator_pb2.GeneratorDetails(
+                id='attention_rnn',
+                description='Melody RNN with lookback encoding and attention.'),
+            note_seq.KeyMelodyEncoderDecoder(
+                min_note=DEFAULT_MIN_NOTE, max_note=DEFAULT_MAX_NOTE),
+            contrib_training.HParams(
+                batch_size=128,
+                rnn_layer_sizes=[128, 128],
+                dropout_keep_prob=0.5,
+                attn_length=40,
+                clip_norm=3,
+                learning_rate=0.001))
+
+
+import tf.nn.rnn_cell as rnn
+
+dropout_keep_prob = 0.5
+
+cells = [rnn.DropoutWrapper(rnn.BasicLSTMCell), output_keep_prob=dropout_keep_prob for _ in range(128)]

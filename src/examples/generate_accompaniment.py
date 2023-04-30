@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     # acoustic bass, see https://fmslogo.sourceforge.io/manual/midi-instrument.html for instrument choices
     accompaniment_instrument = 33
-    activation_threshold = 0.0
+    activation_threshold = 0.1
     pm = dh.add_accompaniment_track(melody_pm, generated_seq,
                                     parameters['output'],
                                     velocity=100,
