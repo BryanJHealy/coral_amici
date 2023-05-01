@@ -48,11 +48,10 @@ class MainWindow:
         ]
 
         self.timeline = [
-            # [sg.Slider((0,100), orientation='h', size=(138,15))],
-            [ sg.T('Selection Start:End -> 0s : 15s',size=(32,1), key='-TIMELINE_TEXT-')],
-            [ sg.Slider((0,100), key='-SLIDER-', orientation='h', enable_events=True, disable_number_display=True, size=(138,15))]
-            # [ sg.T('15', size=(4,1), key='-SLIDER_RIGHT-')]
-            # [sg.Slider((0,100), orientation='h', size=(200,15), default_value=self.model_seq_secs)]
+            [ sg.T('Selection Start:End -> ', size=(22,1), key='-TIMELINE_TEXT-'),
+              sg.Input(default_text='0', size=(4,1), key='-SELECTION_START-', enable_events=True), sg.T('s:'),
+              sg.Input(default_text='15', size=(4,1), key='-SELECTION_END-', enable_events=True), sg.T('s')],
+            [ sg.Slider((0,100), key='-SLIDER-', orientation='h', enable_events=True, disable_number_display=True, size=(138,15), default_value=self.selection_start)]
         ]
 
         self.composer = [
@@ -82,6 +81,8 @@ class MainWindow:
             '-NEXT-': self.next,
             '-GENERATE-': self.generate_accompaniment,
             '-SLIDER-': self.update_timeline,
+            '-SELECTION_START-': self.update_selection_start,
+            '-SELECTION_END-': self.update_selection_end,
             '-MODEL-': self.select_model,
             None: print
         }
@@ -134,8 +135,25 @@ class MainWindow:
     def update_timeline(self):
         self.selection_start = int(self.window_vals['-SLIDER-'])
         self.selection_end = min(self.selection_start + 15, self.song_duration)
-        self.window['-TIMELINE_TEXT-'].update(f'Selection Start:End -> {self.selection_start}s : {self.selection_end}s')
+        # self.window['-TIMELINE_TEXT-'].update(f'Selection Start:End -> {self.selection_start}s : {self.selection_end}s')
+        self.window['-SELECTION_START-'].update(f'{self.selection_start}')
+        self.window['-SELECTION_END-'].update(f'{self.selection_end}')
         self.model.set_selection(self.selection_start)
+
+    def update_slider(self, **kwargs):
+        self.window['-SLIDER-'].update(range=(0, self.song_duration - self.model_seq_secs), kwargs=kwargs)
+
+    def update_selection_start(self):
+        self.selection_start = int(self.window_vals['-SELECTION_START-'])
+        self.selection_end = self.selection_start + self.model_seq_secs
+        self.window['-SELECTION_END-'].update(self.selection_end)
+        self.window['-SLIDER-'].update(self.selection_start)
+
+    def update_selection_end(self):
+        self.selection_end = int(self.window_vals['-SELECTION_END-'])
+        self.selection_start = max(0, self.selection_end - self.model_seq_secs)
+        self.window['-SELECTION_START-'].update(self.selection_start)
+        self.window['-SLIDER-'].update(self.selection_start)
 
     def prompt(self, message, filepath=False):
         layout = [[sg.Text(f'{message}')],      
@@ -164,10 +182,10 @@ class MainWindow:
             self.pm, (self.selection_start, self.selection_end) = mu.import_and_select(self.midi_filepath, seq_duration)
             self.song_duration = self.pm.get_end_time()
             self.display_notification(LogLevel.INFO, f'Loaded {self.midi_filepath}')
-            # roll_img = self.get_plot_img()
             dh.plot_piano_roll(self.pm, axes=False, save_file='track.png')
             self.window['-TRACK_IMG0-'].update('track.png')
             self.model.set_input_file(self.midi_filepath)
+            self.update_slider()
         except Exception as e:
             print(e)
             self.display_notification(LogLevel.WARNING, f'Unable to load {self.midi_filepath}\nCheck path and try again.')
