@@ -19,3 +19,10 @@ src/models/vae_port.py
 src/examples/lstm_accompaniment*
 src/examples/training_checkpoints
 src/examples/old_ds
+src/track.png
+src/interface/track1.png
+src/models/lstm_vae.zip
+src/models/lstm_vae/saved_model.pb
+src/models/lstm_vae/variables/variables.data-00000-of-00001
+src/models/lstm_vae/variables/variables.index
+src/interface/test_graph.py
