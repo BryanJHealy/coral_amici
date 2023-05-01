@@ -16,11 +16,17 @@ class MainWindow:
         self.autosave = autosave
         self.player = Player()
         self.midi_filepath = None
+
         self.model_seq_secs = model_seq_secs
         self.selection_start = 0
         self.selection_end = self.selection_start + self.model_seq_secs
+
         self.pm = pretty_midi.PrettyMIDI()
         self.song_duration = 100
+        self.tracks = []
+        self.num_tracks = 0
+        self.max_tracks = 4
+
         self.log_level=log_level
         self.playing = False
         self.recording = False
@@ -60,8 +66,8 @@ class MainWindow:
             # [sg.Image('/home/bryan/amici_model/coral_amici/src/interface/empty_track.png', key='-TRACK_IMG0-')],
             [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG0-')],
             [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG1-')],
-            # [sg.Image('empty_track.png', key='-TRACK_IMG2-')],
-            # [sg.Image('empty_track.png', key='-TRACK_IMG3-')]
+            [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG2-')],
+            [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG3-')],
         ]
         self.message_log = MessageLog(log_level=LogLevel.DEBUG)
 
@@ -86,6 +92,8 @@ class MainWindow:
             '-MODEL-': self.select_model,
             None: print
         }
+
+        self.autosave_functions = ['-IMPORT-', '-SAVE-', '-RECORD-', '-GENERATE-' ]
 
         sg.theme('DarkBlue15')
         self.window = sg.Window('AMICI Composer', self.layout)
@@ -120,6 +128,9 @@ class MainWindow:
             # self.display_notification(LogLevel.DEBUG, f'{event}')
             # self.display_notification(LogLevel.DEBUG, f'{values}')
 
+            if self.autosave and event in self.autosave_functions:
+                self.save()
+
             if event == sg.WIN_CLOSED or event == 'Exit':
                 self.display_notification(LogLevel.INFO, 'Shutting down...')
                 break
@@ -139,6 +150,7 @@ class MainWindow:
         self.window['-SELECTION_START-'].update(f'{self.selection_start}')
         self.window['-SELECTION_END-'].update(f'{self.selection_end}')
         self.model.set_selection(self.selection_start)
+        self.update_track_selections()
 
     def update_slider(self, **kwargs):
         self.window['-SLIDER-'].update(range=(0, self.song_duration - self.model_seq_secs), kwargs=kwargs)
@@ -148,12 +160,16 @@ class MainWindow:
         self.selection_end = self.selection_start + self.model_seq_secs
         self.window['-SELECTION_END-'].update(self.selection_end)
         self.window['-SLIDER-'].update(self.selection_start)
+        self.model.set_selection(self.selection_start)
+        self.update_track_selections()
 
     def update_selection_end(self):
         self.selection_end = int(self.window_vals['-SELECTION_END-'])
         self.selection_start = max(0, self.selection_end - self.model_seq_secs)
         self.window['-SELECTION_START-'].update(self.selection_start)
         self.window['-SLIDER-'].update(self.selection_start)
+        self.model.set_selection(self.selection_start)
+        self.update_track_selections()
 
     def prompt(self, message, filepath=False):
         layout = [[sg.Text(f'{message}')],      
@@ -171,6 +187,25 @@ class MainWindow:
         print('closing...')
         return values['-IN-']
 
+    def update_track_crop(self, track_num):
+        dh.plot_piano_roll(self.pm, tracks=(self.tracks[track_num][0],), axes=False, save_file=self.tracks[track_num][1])
+        self.window[f'-TRACK_IMG{track_num}-'].update(self.tracks[track_num][1])
+
+    def update_track_selections(self):
+        for track_num in range(self.num_tracks):
+            self.update_track_crop(track_num)
+
+    def add_track(self, instrument):
+        if self.num_tracks >= self.max_tracks:
+            self.display_notification(LogLevel.WARNING, f'Already reached max tracks({self.max_tracks})')
+            return
+        else:    
+            self.pm.instruments.append(instrument)
+            img_file = os.path.join(self.interface_dir, f'TRACK_IMG{self.num_tracks}.png')
+            self.tracks.append( (instrument.name, img_file) )
+            self.update_track_crop(self.num_tracks)
+            self.num_tracks += 1
+
     def import_midi(self, overwrite=True):
         self.midi_filepath = None
 
@@ -181,11 +216,17 @@ class MainWindow:
             seq_duration = self.model_seq_secs if self.model_seq_secs else -1
             self.pm, (self.selection_start, self.selection_end) = mu.import_and_select(self.midi_filepath, seq_duration)
             self.song_duration = self.pm.get_end_time()
-            self.display_notification(LogLevel.INFO, f'Loaded {self.midi_filepath}')
-            dh.plot_piano_roll(self.pm, axes=False, save_file='track.png')
-            self.window['-TRACK_IMG0-'].update('track.png')
             self.model.set_input_file(self.midi_filepath)
             self.update_slider()
+
+            for instrument in self.pm.instruments:
+                if self.num_tracks >= self.max_tracks:
+                    self.display_notification(LogLevel.WARNING, f'Already reached max tracks({self.max_tracks})')
+                    break
+                
+                self.add_track(instrument)
+
+            self.display_notification(LogLevel.INFO, f'Loaded {self.midi_filepath}')
         except Exception as e:
             print(e)
             self.display_notification(LogLevel.WARNING, f'Unable to load {self.midi_filepath}\nCheck path and try again.')
@@ -231,20 +272,16 @@ class MainWindow:
             self.model_name = self.window_vals['-MODEL-']
             self.load_model()
     
-    def add_track(self, instrument='piano', notes=None):
-        self.pm.instruments.append(pretty_midi.Instrument(program=pretty_midi.instrument_name_to_program(instrument)))
-        # TODO: add new track visual
-    
     def generate_accompaniment(self):
         # load accompaniment model
-        # generation = model(self.selection)
         self.display_notification(LogLevel.INFO, 'Generating accompaniment...')
-        gen_pm = self.model.generate('generated.png')
-        self.window['-TRACK_IMG1-'].update('generated.png')
+        gen_inst = self.model.generate()
+        self.add_track(gen_inst)
     
     def save(self):
         # Save pm to .mid file
         # TODO: use pikle to save pm memory for quicker loading later
+        self.pm.write('amici_composition.mid')
         self.display_notification(LogLevel.INFO, 'Saved.')
 
     def delete_track(self):

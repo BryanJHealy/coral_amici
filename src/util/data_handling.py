@@ -206,6 +206,7 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10, sampling
 
 
 def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'),
+                    start_time=0, duration=None,
                     axes=True, save_file=None):
     plt.figure(figsize=(20, 4))
     colors = ['b', 'r', 'g', 'p']
@@ -215,9 +216,17 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
             notes = song.instruments[instrument_idx].notes
             pitches, starts, stops = [], [], []
             for note in notes:
-                pitches.append(note.pitch)
-                starts.append(note.start)
-                stops.append(note.end)
+                if note.end >= start_time:
+                    if duration:
+                        if note.start <= start_time + duration:
+                            pitches.append(note.pitch)
+                            starts.append(max(note.start, start_time))
+                            stops.append(min(note.end), start_time + duration)
+                    else:
+                        pitches.append(note.pitch)
+                        starts.append(max(note.start, start_time))
+                        stops.append(note.end)
+
             plot_pitch = np.stack([pitches, pitches], axis=0)
             plot_start_stop = np.stack([starts, stops], axis=0)
             plt.plot(plot_start_stop, plot_pitch, color=colors[plt_idx], marker="|",

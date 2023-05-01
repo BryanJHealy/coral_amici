@@ -31,7 +31,7 @@ class AccompanimentGenerator:
     def set_selection(self, start):
         self.start_secs = start
 
-    def generate(self, roll_file=None):
+    def generate(self):
 
         # Parse input midi file using PrettyMidi and collect list of input sequence windows
         try:
@@ -49,18 +49,13 @@ class AccompanimentGenerator:
         # acoustic bass, see https://fmslogo.sourceforge.io/manual/midi-instrument.html for instrument choices
         accompaniment_instrument = 33
         activation_threshold = 0.1
-        pm = dh.add_accompaniment_track(melody_pm, generated_seq,
-                                        self.out_file,
-                                        velocity=100,
-                                        instrument_num=accompaniment_instrument,
-                                        concat_sequential=True,
-                                        sample_frequency=self.samples_per_sec,
-                                        activation_threshold=activation_threshold)
+        
+        gen_instrument = dh.build_accompaniment_track(generated_seq, accompaniment_instrument, velocity=100,
+                                               concat_sequential=True,
+                                               sample_frequency=self.samples_per_sec,
+                                               activation_threshold=activation_threshold)
 
-        if roll_file:
-            dh.plot_piano_roll(pm, tracks=('generation',), save_file=roll_file, axes=False)
-
-        return pm
+        return gen_instrument
 
 
 if __name__ == '__main__':
