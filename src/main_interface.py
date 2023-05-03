@@ -7,8 +7,8 @@ from interface.components.message_log import MessageLog
 from interface.components.message_log import LogLevel
 from interface.util.player import Player
 import interface.util.midi_util as mu
-
-from generate_accompaniment import AccompanimentGenerator
+import util.data_handling as dh
+from accompaniment_generator import AccompanimentGenerator
 
 
 class MainWindow:
@@ -17,9 +17,9 @@ class MainWindow:
         self.player = Player()
         self.midi_filepath = None
         self.model_seq_secs = model_seq_secs
-        self.selection_start = None
-        self.selection_end = None
-        self.pm = None
+        self.selection_start = 0
+        self.selection_end = self.selection_start + self.model_seq_secs
+        self.pm = pretty_midi.PrettyMIDI()
         self.song_duration = 100
         self.log_level=log_level
         self.playing = False
@@ -28,20 +28,13 @@ class MainWindow:
         self.main_dir = os.path.abspath(os.path.dirname(__file__))
         self.interface_dir = os.path.join(self.main_dir, 'interface')
 
-        # # Accompaniment model
-        # self.sequence_seconds = 15
-        # self.start_secs = start_secs  # sequence start offset from beginning of file
-        # self.skip_empty_intro = skip_empty_intro  # sequence starts at first note after offset if True, else at offset
-        # self.vocab_size = vocab_size  # 0 to 127, representing the notes from C-1 to G9
-        # self.samples_per_sec = samples_per_sec  # data resolution
-        # self.only_keep_melody_track = only_keep_melody_track
-
-        self.model_list = ['LSTM VAE', 'LSTM']
-        self.model_paths = {self.model_list[0]: os.path.join(self.main_dir, 'models', 'lstm_vae'),
-                            self.model_list[1]: os.path.join(self.main_dir, 'models', 'lstm_accompaniment')}
+        self.model_list = ['LSTM', 'LSTM VAE']
+        self.model_paths = {self.model_list[0]: os.path.join(self.main_dir, 'examples', 'lstm_accompaniment'),
+                            self.model_list[1]: os.path.join(self.main_dir, 'examples', 'lstm_vae')}
         self.model_name = self.model_list[0]
         self.model_path = self.model_paths[self.model_name]
-        # self.model = self.load_model()
+        self.model = None
+        self.load_model()
 
         self.control_panel = [
             sg.Button('Import', key='-IMPORT-'),
@@ -66,7 +59,7 @@ class MainWindow:
             # [sg.Text('Track 1', size=(20,10)), sg.Graph(canvas_size=(1550, 250), graph_bottom_left=(0,0), graph_top_right=(400, 400), key='-GRAPH0-')],
             # [sg.Graph(canvas_size=(1550, 250), graph_bottom_left=(0,0), graph_top_right=(400, 400), key='-GRAPH0-')],
             # [sg.Image('/home/bryan/amici_model/coral_amici/src/interface/empty_track.png', key='-TRACK_IMG0-')],
-            # [sg.Image('/src/interface/empty_track.png', key='-TRACK_IMG0-')],
+            [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG0-')],
             [sg.Image(os.path.join(self.interface_dir, 'empty_track.png'), key='-TRACK_IMG1-')],
             # [sg.Image('empty_track.png', key='-TRACK_IMG2-')],
             # [sg.Image('empty_track.png', key='-TRACK_IMG3-')]
@@ -142,8 +135,7 @@ class MainWindow:
         self.selection_start = int(self.window_vals['-SLIDER-'])
         self.selection_end = min(self.selection_start + 15, self.song_duration)
         self.window['-TIMELINE_TEXT-'].update(f'Selection Start:End -> {self.selection_start}s : {self.selection_end}s')
-        # self.window['-SLIDER_RIGHT-'].update(self.selection_end)
-
+        self.model.set_selection(self.selection_start)
 
     def prompt(self, message, filepath=False):
         layout = [[sg.Text(f'{message}')],      
@@ -161,7 +153,7 @@ class MainWindow:
         print('closing...')
         return values['-IN-']
 
-    def import_midi(self):
+    def import_midi(self, overwrite=True):
         self.midi_filepath = None
 
         # try:
@@ -172,8 +164,10 @@ class MainWindow:
             self.pm, (self.selection_start, self.selection_end) = mu.import_and_select(self.midi_filepath, seq_duration)
             self.song_duration = self.pm.get_end_time()
             self.display_notification(LogLevel.INFO, f'Loaded {self.midi_filepath}')
-            roll_img = self.get_plot_img()
+            # roll_img = self.get_plot_img()
+            dh.plot_piano_roll(self.pm, axes=False, save_file='track.png')
             self.window['-TRACK_IMG0-'].update('track.png')
+            self.model.set_input_file(self.midi_filepath)
         except Exception as e:
             print(e)
             self.display_notification(LogLevel.WARNING, f'Unable to load {self.midi_filepath}\nCheck path and try again.')
@@ -210,8 +204,8 @@ class MainWindow:
         # increment sequence pointerssby seq_len if possible or go to end
 
     def load_model(self):        
-        self.model = AccompanimentGenerator(self.model_path, self.midi_filepath, 'test_generation.mid', roll=False,
-                 sequence_seconds=15, start_secs=0, skip_empty_intro=True,
+        self.model = AccompanimentGenerator(self.model_path, self.midi_filepath, 'test_generation.mid',
+                 sequence_seconds=15, start_secs=self.selection_start, skip_empty_intro=True,
                  vocab_size=128, samples_per_sec=1, only_keep_melody_track=True)
 
     def select_model(self):
@@ -219,7 +213,7 @@ class MainWindow:
             self.model_name = self.window_vals['-MODEL-']
             self.load_model()
     
-    def add_track(self, instrument='piano'):
+    def add_track(self, instrument='piano', notes=None):
         self.pm.instruments.append(pretty_midi.Instrument(program=pretty_midi.instrument_name_to_program(instrument)))
         # TODO: add new track visual
     
@@ -227,7 +221,8 @@ class MainWindow:
         # load accompaniment model
         # generation = model(self.selection)
         self.display_notification(LogLevel.INFO, 'Generating accompaniment...')
-        self.model.generate()
+        gen_pm = self.model.generate('generated.png')
+        self.window['-TRACK_IMG1-'].update('generated.png')
     
     def save(self):
         # Save pm to .mid file

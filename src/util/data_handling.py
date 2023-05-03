@@ -205,7 +205,8 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10, sampling
     return dataset
 
 
-def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation')):
+def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'),
+                    axes=True, save_file=None):
     plt.figure(figsize=(20, 4))
     colors = ['b', 'r', 'g', 'p']
     plt_idx = 0
@@ -222,10 +223,16 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
             plt.plot(plot_start_stop, plot_pitch, color=colors[plt_idx], marker="|",
                      label=song.instruments[instrument_idx].name)
             plt_idx += 1
-    plt.xlabel('Time [s]')
-    plt.ylabel('Pitch')
-    _ = plt.title('Melody and Generated Accompaniment')
-    plt.show()
+    if axes:
+        plt.xlabel('Time [s]')
+        plt.ylabel('Pitch')
+        _ = plt.title('Melody and Generated Accompaniment')
+    else:
+        plt.axis('off')
+    if save_file:
+        plt.savefig(save_file, bbox_inches='tight', pad_inches=0)
+    else:
+        plt.show()
 
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,

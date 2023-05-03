@@ -1,5 +1,5 @@
-import os
-os.environ['SDL_AUDIODRIVER'] = 'dsp'
+# import os
+# os.environ['SDL_AUDIODRIVER'] = 'dsp'
 
 import pygame
 import pretty_midi
@@ -16,8 +16,8 @@ class Player(Thread):
         self.fadeout = fadeout
         self.thread = None
 
-        # pygame.mixer.init(freq, bitsize, channels, buffer)
-        # pygame.mixer.music.set_volume(self.volume)
+        pygame.mixer.init(freq, bitsize, channels, buffer)
+        pygame.mixer.music.set_volume(self.volume)
 
     def play_song(self, filename):
         if filename:
