@@ -51,9 +51,8 @@ class AccompanimentGenerator:
         activation_threshold = 0.1
         
         gen_instrument = dh.build_accompaniment_track(generated_seq, accompaniment_instrument, velocity=100,
-                                               concat_sequential=True,
-                                               sample_frequency=self.samples_per_sec,
-                                               activation_threshold=activation_threshold)
+                                               concat_sequential=True, sample_frequency=self.samples_per_sec,
+                                               activation_threshold=activation_threshold, offset=self.start_secs)
 
         return gen_instrument
 

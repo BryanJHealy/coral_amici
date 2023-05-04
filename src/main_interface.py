@@ -152,8 +152,8 @@ class MainWindow:
         self.model.set_selection(self.selection_start)
         self.update_track_selections()
 
-    def update_slider(self, **kwargs):
-        self.window['-SLIDER-'].update(range=(0, self.song_duration - self.model_seq_secs), kwargs=kwargs)
+    def update_slider_range(self):
+        self.window['-SLIDER-'].update(range=(0, self.song_duration - self.model_seq_secs))
 
     def update_selection_start(self):
         self.selection_start = int(self.window_vals['-SELECTION_START-'])
@@ -188,7 +188,9 @@ class MainWindow:
         return values['-IN-']
 
     def update_track_crop(self, track_num):
-        dh.plot_piano_roll(self.pm, tracks=(self.tracks[track_num][0],), axes=False, save_file=self.tracks[track_num][1])
+        dh.plot_piano_roll(self.pm, tracks=(self.tracks[track_num][0],),
+                           start_time=self.selection_start, duration=self.model_seq_secs,
+                           axes=False, save_file=self.tracks[track_num][1], background_color='blue')
         self.window[f'-TRACK_IMG{track_num}-'].update(self.tracks[track_num][1])
 
     def update_track_selections(self):
@@ -217,11 +219,11 @@ class MainWindow:
             self.pm, (self.selection_start, self.selection_end) = mu.import_and_select(self.midi_filepath, seq_duration)
             self.song_duration = self.pm.get_end_time()
             self.model.set_input_file(self.midi_filepath)
-            self.update_slider()
+            self.update_slider_range()
 
             for instrument in self.pm.instruments:
-                if self.num_tracks >= self.max_tracks:
-                    self.display_notification(LogLevel.WARNING, f'Already reached max tracks({self.max_tracks})')
+                if self.num_tracks >= self.max_tracks -1:
+                    self.display_notification(LogLevel.INFO, f'Reached max import tracks({self.max_tracks -1})')
                     break
                 
                 self.add_track(instrument)

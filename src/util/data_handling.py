@@ -206,7 +206,7 @@ def get_pop_data(path, sequence_duration, vocab_size=128, max_files=10, sampling
 
 
 def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'),
-                    start_time=0, duration=None,
+                    start_time=0, duration=None, background_color='white',
                     axes=True, save_file=None):
     plt.figure(figsize=(20, 4))
     colors = ['b', 'r', 'g', 'p']
@@ -221,7 +221,7 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
                         if note.start <= start_time + duration:
                             pitches.append(note.pitch)
                             starts.append(max(note.start, start_time))
-                            stops.append(min(note.end), start_time + duration)
+                            stops.append(min(note.end, start_time + duration))
                     else:
                         pitches.append(note.pitch)
                         starts.append(max(note.start, start_time))
@@ -238,6 +238,9 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
         _ = plt.title('Melody and Generated Accompaniment')
     else:
         plt.axis('off')
+
+    # plt.rcParams['axes.facecolor'] = background_color
+
     if save_file:
         plt.savefig(save_file, bbox_inches='tight', pad_inches=0)
     else:
@@ -245,7 +248,7 @@ def plot_piano_roll(song: pretty_midi.PrettyMIDI, tracks=('MELODY', 'generation'
 
 
 def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
-                              sample_frequency=60, velocity=100,
+                              sample_frequency=60, velocity=100, offset=0,
                               concat_sequential=True, activation_threshold=0.8):
     instrument = pretty_midi.Instrument(program=instrument_num, is_drum=False,
                                         name='generation')
@@ -270,8 +273,8 @@ def build_accompaniment_track(sequence: np.ndarray, instrument_num=33,
     for pitch_idx in range(len(notes)):
         if notes[pitch_idx] != (-1, -1):
             note = pretty_midi.Note(velocity=velocity, pitch=pitch_idx,
-                                    start=(notes[pitch_idx][0] / sample_frequency),
-                                    end=(notes[pitch_idx][1] / sample_frequency) + 1)
+                                    start=((notes[pitch_idx][0] / sample_frequency) + offset),
+                                    end=((notes[pitch_idx][1] / sample_frequency) + 1 + offset))
             instrument.notes.append(note)
 
     return instrument
